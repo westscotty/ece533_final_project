@@ -1,0 +1,90 @@
+\documentclass[journal]{IEEEtran}
+\usepackage{cite}
+\usepackage{url}
+\usepackage{titlesec}
+
+\begin{document}
+
+\title{A Comparative Study of Corner Detection Algorithms in OpenCV and Pretrained CNN Models}
+
+\author{\IEEEauthorblockN{Weston Scott}
+\IEEEauthorblockA{\\University of Arizona\\ scottwj@arizona.edu}
+\vspace{-10pt}
+}
+
+\maketitle
+
+\begin{abstract}
+Corner detection is a critical operation in computer vision, playing a key role in tasks such as feature matching, object recognition, and motion tracking. This project aims to perform a comprehensive comparison of corner detection algorithms available in the OpenCV Python package (e.g., Harris, Shi-Tomasi, FAST, ORB, SIFT) against pretrained corner detection convolutional neural network (CNN) models in PyTorch. By optimizing the parameters of each algorithm and performing extensive benchmarks, the study seeks to identify the most efficient (fastest), accurate, and scale-invariant algorithms, with particular emphasis on performance under zoom-in and zoom-out transformations.
+\end{abstract}
+
+\section{Introduction}
+Corner detection is fundamental in computer vision applications, enabling precise identification of points of interest in images. OpenCV provides a variety of corner detection algorithms, each with unique strengths and limitations. Meanwhile, pretrained CNN models have emerged as powerful alternatives, offering advanced feature extraction capabilities. This project aims to evaluate these methods systematically to determine the best algorithm for different use cases.
+
+\section{Project Description}
+The proposed project will include the following steps:
+\begin{itemize}
+    \item \textbf{Algorithm Review:} Explore corner detection methods available in OpenCV, including Harris, Shi-Tomasi, FAST, ORB, and SIFT, as well as pretrained CNN models designed for feature detection.
+    \item \textbf{Parameter Optimization:} Tune the parameters of each OpenCV algorithm to achieve optimal performance, considering accuracy and computational efficiency.
+    \item \textbf{Implementation:} Implement a unified pipeline in Python to evaluate and compare the performance of OpenCV algorithms and CNN models using the dataset from \cite{mdpi_dataset}.
+    \item \textbf{Benchmarking:} Conduct a comprehensive benchmark to evaluate the algorithms based on:
+    \begin{enumerate}
+        \item \textbf{Efficiency:} Measure execution time across different image resolutions.
+        \item \textbf{Accuracy:} Assess corner detection precision using ground truth data from the dataset.
+        \item \textbf{Scale Invariance:} Perform zoom-in and zoom-out tests to evaluate robustness.
+    \end{enumerate}
+\end{itemize}
+
+\section{Required Resources}
+The project will require:
+\begin{itemize}
+    \item \textbf{Software:} Python 3.X, OpenCV, PyTorch, NumPy, Matplotlib.
+    \item \textbf{Dataset:} The dataset and benchmark study from \cite{mdpi_dataset}.
+    \item \textbf{Computing Resources:} A workstation or server with a GPU for efficient training and evaluation of CNN models.
+    \item \textbf{References:} Documentation and research papers on OpenCV algorithms and CNN-based corner detection.
+\end{itemize}
+
+\section{Implementation Plan}
+The implementation will include the following steps:
+\begin{itemize}
+    \item Develop a Python script to load the dataset, preprocess images, and apply corner detection algorithms.
+    \item Optimize each OpenCV algorithm by adjusting parameters such as window size, threshold values, and sensitivity settings.
+    \item Use pretrained PyTorch models for CNN-based corner detection and evaluate their performance on the same dataset.
+    \item Compare the results using metrics such as precision, recall, F1 score, and execution time.
+    \item Perform zoom tests by scaling images up and down and measuring the stability of detected corners.
+\end{itemize}
+
+\section{Testing and Evaluation}
+The algorithms will be tested on the dataset from \cite{mdpi_dataset}. Evaluation criteria will include:
+\begin{itemize}
+    \item Execution time for processing images of varying resolutions.
+    \item Accuracy metrics compared against the dataset’s ground truth.
+    \item Robustness under scale transformations.
+\end{itemize}
+
+\section{Conclusion}
+This study will provide a detailed comparison of traditional corner detection algorithms and modern CNN-based approaches, offering insights into their strengths and weaknesses. The findings will contribute to the selection of appropriate algorithms for specific computer vision tasks.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\begin{thebibliography}{1}
+
+    \bibitem{mdpi_dataset} 
+    M. Hübner and A. Rettenmeier, “Benchmarking corner detection algorithms,” \textit{Applied Sciences}, vol. 12, no. 23, 2022. [Online]. Available: \url{https://www.mdpi.com/2076-3417/12/23/11984}.
+
+    \bibitem{opencv_doc} 
+    OpenCV Documentation, [Online]. Available: \url{https://docs.opencv.org/}.
+
+    \bibitem{torch_doc} 
+    PyTorch Documentation, [Online]. Available: \url{https://pytorch.org/docs/}.
+
+    \bibitem{harris} 
+    C. Harris and M. Stephens, “A combined corner and edge detector,” in \textit{Proc. of the Alvey Vision Conference}, 1988, pp. 147–152.
+
+    \bibitem{sift} 
+    D. G. Lowe, “Distinctive image features from scale-invariant keypoints,” \textit{International Journal of Computer Vision}, vol. 60, no. 2, pp. 91–110, 2004.
+
+\end{thebibliography}
+
+\end{document}
