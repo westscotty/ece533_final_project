@@ -1,0 +1,69 @@
+\section{Theory and Algorithm Overview}
+
+\subsection{Harris Corner Detector}
+The Harris corner detector \cite{Harris_Corner} is based on the auto-correlation function that measures local changes of intensity with patches shifted in different directions. A corner is defined as a point where the image gradient has large variations in orthogonal directions.
+
+Given an image $I(x, y)$, the structure tensor $M$ over a window $w$ is defined as:
+\begin{equation}
+M = \sum_w \begin{bmatrix} I_x^2 & I_x I_y \\ I_x I_y & I_y^2 \end{bmatrix}
+\end{equation}
+where $I_x$ and $I_y$ are image gradients.
+
+The Harris response is calculated as:
+\begin{equation}
+R = \det(M) - k \cdot (\text{trace}(M))^2
+\end{equation}
+where $k$ is a sensitivity parameter typically in [0.04, 0.06]. Corners are where $R$ exceeds a threshold.
+
+\subsection{Shi-Tomasi (Good Features to Track)}
+Shi and Tomasi \cite{Shi_Tomasi} proposed an improvement over Harris by considering the minimum eigenvalue $\lambda_{\min}$ of $M$ instead of the Harris response:
+\begin{equation}
+R = \min(\lambda_1, \lambda_2)
+\end{equation}
+This avoids the empirical $k$ and selects points that are more stable under tracking conditions.
+
+\subsection{FAST (Features from Accelerated Segment Test)}
+FAST \cite{FAST} accelerates corner detection by comparing a circle of 16 pixels around a candidate point $p$. A point is a corner if $N$ contiguous pixels are significantly brighter or darker than $p$ by a threshold $t$:
+\begin{equation}
+\text{Corner}(p) = \left| I_{x,y} - I_p \right| > t
+\end{equation}
+A machine learning approach was proposed to order pixel tests for optimal speed.
+
+\subsection{ORB (Oriented FAST and Rotated BRIEF)}
+ORB \cite{ORB} combines FAST with BRIEF descriptors and adds orientation for rotation invariance. Orientation is calculated using image moments:
+\begin{equation}
+\theta = \arctan\left(\frac{\mu_{01}}{\mu_{10}}\right)
+\end{equation}
+This orientation is used to steer the BRIEF descriptor, making it robust to in-plane rotation.
+
+\subsection{SIFT (Scale-Invariant Feature Transform)}
+SIFT \cite{SIFT} detects extrema in scale space using Difference of Gaussians (DoG):
+\begin{equation}
+D(x, y, \sigma) = L(x, y, k\sigma) - L(x, y, \sigma)
+\end{equation}
+where $L$ is the Gaussian-blurred image. Keypoints are filtered using contrast thresholding and assigned orientations based on gradient histograms.
+Descriptors are histograms of gradients around the keypoint, quantized into 8 directions over a 4x4 spatial grid.
+
+\subsection{BRISK (Binary Robust Invariant Scalable Keypoints)}
+BRISK \cite{BRISK} uses a circular sampling pattern to compute intensity comparisons between point pairs. A binary descriptor is built from these comparisons:
+\begin{equation}
+B_i = \begin{cases} 1 & I(p_i) < I(q_i) \\ 0 & \text{otherwise} \end{cases}
+\end{equation}
+The keypoint orientation is estimated by averaging gradient directions of long-distance pairs.
+
+\subsection{AGAST (Adaptive and Generic Accelerated Segment Test)}
+AGAST \cite{AGAST} improves upon FAST by using decision trees for adaptive pixel selection. The corner test remains similar, but the ordering is learned using machine learning to maximize classification speed and accuracy.
+
+\subsection{KAZE (Nonlinear Scale Space)}
+KAZE \cite{KAZE} constructs a nonlinear scale space using the Perona-Malik diffusion equation:
+\begin{equation}
+\frac{\partial L}{\partial t} = \text{div}(c(x, y, t) \cdot \nabla L)
+\end{equation}
+where $c(x,y,t)$ is the conductivity function. Keypoints are detected in this nonlinear space using DoG, and descriptors are constructed based on gradient orientation and scale.
+
+\subsection{AKAZE (Accelerated KAZE)}
+AKAZE \cite{KAZE} uses Fast Explicit Diffusion (FED) to speed up KAZE. The descriptors in AKAZE are binary (MLDB - Modified Local Difference Binary) and more efficient:
+\begin{equation}
+\text{MLDB}(p) = \sum_{i=1}^{n} \text{sgn}(I(p_i) - I(q_i)) \cdot 2^i
+\end{equation}
+This enables fast matching while preserving scale and rotation invariance.

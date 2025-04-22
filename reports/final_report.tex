@@ -1,0 +1,224 @@
+\documentclass[journal]{IEEEtran}
+\usepackage{cite}
+\usepackage{url}
+\usepackage{titlesec}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{xcolor}  % Optional: For color syntax highlightings
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{graphicx}
+\usepackage{algorithm}
+\usepackage{float}
+\usepackage{dblfloatfix}
+\usepackage{caption}
+\usepackage[caption=false]{subfig} % For figure sub-captions (if needed)
+\usepackage[hidelinks]{hyperref}  % Load this last
+\usepackage{cleveref}
+
+\lstdefinestyle{python}{
+    language=Python,
+    basicstyle=\ttfamily\footnotesize,  % Choose font style and size
+    keywordstyle=\color{blue},          % Color for keywords
+    commentstyle=\color{green},         % Color for comments
+    stringstyle=\color{red},            % Color for strings
+    breaklines=true,                    % Line breaking
+    numbers=left,                       % Line numbers on the left
+    numberstyle=\tiny\color{gray},      % Style of the line numbers
+    backgroundcolor=\color{white},      % Background color of the code box
+    frame=single,                       % Add a frame around the code
+    captionpos=b                        % Position of the caption (bottom)
+}
+
+\begin{document}
+
+\title{Final Project:\\Benchmarking Corner Detection Algorithms}
+
+\author{
+\IEEEauthorblockN{Weston Scott\\}
+\IEEEauthorblockA{ECE 533: Digital Image Processing\\Spring 2025\\University of Arizona\\Email: scottwj@arizona.edu}
+}
+
+\maketitle
+
+\thispagestyle{plain}  % Page number on the first page
+\pagestyle{plain} 
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{\textwidth}
+        \centering
+    \includegraphics[width=0.6\linewidth]{/home/wscott/UA/arizona.png}
+    \end{minipage}
+\end{figure}
+
+\onecolumn
+\twocolumn
+\pagebreak
+
+\begin{abstract}
+This project focuses on benchmarking corner detection algorithms in the OpenCV Python library, including Harris, Shi-Tomasi, FAST (Features from Accelerated Segment Test), ORB (Oriented FAST and Rotated BRIEF), SIFT (Scale-Invariant Feature Transform), BRISK (Binary Robust Invariant Scalable Keypoints), AGAST (Adaptive and Generic Accelerated Segment Test), KAZE, and AKAZE. The study involves optimizing each algorithm for independent performance, testing their efficiency (speed), accuracy, and robustness to scale invariance through zooming in and out on test images. The MDPI benchmark dataset will be used for evaluation, along with metrics such as execution time, precision, recall, and repeatability.
+\end{abstract}
+
+\section{Introduction}
+Corner detection is a critical component in computer vision, facilitating feature extraction and tracking in tasks such as image registration, object recognition, and 3D reconstruction. OpenCV provides several well-established corner detection algorithms, and this project aims to compare their performance and optimize their parameters.
+
+\section{Project Description}
+This project included the following steps:
+\begin{itemize}
+    \item \textbf{Theory and Algorithm Overview:} Review the the principles behind the selected algorithms: Harris, Shi-Tomasi, FAST, ORB, SIFT, BRISK, AGAST, KAZE, AKAZE, and SURF
+    \item \textbf{Implementation:} Utilize OpenCV to implement and optimize the parameters for each of the OpenCV algorithms. Optimize each algorithm to achieve its best performance in terms of speed and accuracy.
+    \item \textbf{Results:} Evaluate the algorithms on the MDPI benchmark dataset. Specific tests will include:
+    \begin{enumerate}
+        \item \textbf{Speed:} Measure execution time on images of varying resolutions.
+        \item \textbf{Accuracy:} Use precision, recall, and repeatability metrics to assess detection quality.
+        \item \textbf{Scale Invariance:} Perform zoom-in and zoom-out tests to evaluate the consistency of corner detection.
+    \end{enumerate}
+    \item \textbf{Analysis:} Discussion of results of the selected algorithms
+    \item \textbf{Conclusion:} Final thoughts regarding the algorithms
+\end{itemize}
+
+
+\section{Theory and Algorithm Overview}
+
+\subsection{Harris Corner Detector}
+The Harris corner detector, introduced by Harris and Stephens, is a foundational algorithm for identifying corners in images by analyzing local intensity changes \cite{Harris_Corner}. It leverages the auto-correlation function to detect regions where the image gradient exhibits significant variations in multiple directions, indicating a corner. For an image \( I(x, y) \), the algorithm computes the structure tensor \( M \) over a local window \( w \):
+
+\begin{equation}
+M = \sum_w \begin{bmatrix} I_x^2 & I_x I_y \\ I_x I_y & I_y^2 \end{bmatrix}
+\end{equation}
+
+where \( I_x \) and \( I_y \) are the partial derivatives (gradients) of the image intensity in the \( x \) and \( y \) directions, typically obtained using Sobel filters. The structure tensor encapsulates the distribution of gradient orientations within the window. The corner response \( R \) is computed as:
+
+\begin{equation}
+R = \det(M) - k \cdot (\text{trace}(M))^2
+\end{equation}
+
+where \( \det(M) = \lambda_1 \lambda_2 = I_x^2 I_y^2 - (I_x I_y)^2 \), \( \text{trace}(M) = \lambda_1 + \lambda_2 = I_x^2 + I_y^2 \), and \( \lambda_1, \lambda_2 \) are the eigenvalues of \( M \). The parameter \( k \), typically set between 0.04 and 0.06, balances the sensitivity to corner-like features. A point is classified as a corner if \( R \) exceeds a user-defined threshold, indicating that both eigenvalues are large, signifying high intensity variation in orthogonal directions. The algorithm is robust to noise when combined with Gaussian smoothing but is sensitive to scale changes and requires careful tuning of \( k \) and the threshold \cite{Harris_Corner}. Non-maximum suppression is often applied to ensure only local maxima in \( R \) are selected as corners.
+
+\subsection{Shi-Tomasi (Good Features to Track)}
+The Shi-Tomasi corner detector, proposed by Shi and Tomasi, builds on the Harris detector to improve feature selection for tracking applications \cite{Shi_Tomasi}. Instead of using the Harris response, it directly uses the minimum eigenvalue of the structure tensor \( M \):
+
+\begin{equation}
+R = \min(\lambda_1, \lambda_2)
+\end{equation}
+
+where \( \lambda_1 \) and \( \lambda_2 \) are the eigenvalues of \( M \), as defined in the Harris detector. This approach avoids the empirical constant \( k \), making the detector more stable and less sensitive to parameter tuning. A point is considered a corner if \( R \) exceeds a threshold, ensuring that both eigenvalues are sufficiently large, indicating a strong corner. The Shi-Tomasi method prioritizes features that are robust under small image deformations, making it particularly effective for tracking tasks in video sequences. The algorithm benefits from Gaussian smoothing to reduce noise sensitivity and can incorporate quality-based filtering to select the strongest corners within a region \cite{Shi_Tomasi}. While it lacks inherent scale invariance, its simplicity and reliability make it a staple in OpenCV’s \texttt{goodFeaturesToTrack} function.
+
+\subsection{FAST (Features from Accelerated Segment Test)}
+The FAST algorithm, developed by Rosten and Drummond, is designed for high-speed corner detection, particularly for real-time applications \cite{FAST}. It identifies corners by examining a circle of 16 pixels surrounding a candidate pixel \( p \) at position \( (x, y) \). A pixel \( p \) is classified as a corner if there exists a contiguous arc of at least \( N \) (typically 9 or 12) pixels on the circle that are all significantly brighter or darker than \( p \) by a threshold \( t \):
+
+\begin{equation}
+\text{Corner}(p) = \left| I_{x_i, y_i} - I_p \right| > t \quad \text{for} \quad i \in \{1, 2, \ldots, 16\}
+\end{equation}
+
+where \( I_{x_i, y_i} \) is the intensity of the \( i \)-th pixel on the circle, and \( I_p \) is the intensity of the center pixel. To enhance efficiency, FAST employs a decision tree to prioritize pixel comparisons, testing key pixels (e.g., at positions 1, 5, 9, 13) first to quickly reject non-corners. A machine learning approach optimizes the order of pixel tests based on training data, further boosting speed \cite{FAST}. FAST is highly efficient due to its simple intensity comparisons and minimal computational overhead, but it is sensitive to noise and lacks scale and rotation invariance. Non-maximum suppression is typically applied to refine the detected corners.
+
+\subsection{ORB (Oriented FAST and Rotated BRIEF)}
+ORB, proposed by Rublee et al., combines the FAST keypoint detector with the BRIEF descriptor to create an efficient, rotation-invariant feature detector \cite{ORB}. ORB enhances FAST by adding orientation information to make keypoints robust to in-plane rotations. The orientation of a keypoint is computed using the intensity centroid within a patch around the keypoint, calculated via image moments:
+
+\begin{equation}
+\theta = \arctan\left(\frac{\mu_{01}}{\mu_{10}}\right)
+\end{equation}
+
+where \( \mu_{10} = \sum x I(x, y) \) and \( \mu_{01} = \sum y I(x, y) \) are the first-order moments, and the summation is over the patch. This orientation \( \theta \) is used to rotate the BRIEF descriptor, a binary string formed by comparing intensities of predefined pixel pairs, ensuring rotation invariance. ORB employs a scale pyramid to achieve partial scale invariance, detecting FAST keypoints at multiple image resolutions. A learning-based approach selects the most discriminative pixel pairs for the BRIEF descriptor, improving robustness \cite{ORB}. ORB is computationally efficient, making it suitable for real-time applications like SLAM, and it performs well under moderate scale and rotation changes, though it is less robust than SIFT for extreme transformations.
+
+\subsection{SIFT (Scale-Invariant Feature Transform)}
+SIFT, developed by Lowe, is a robust algorithm for detecting and describing scale-invariant keypoints \cite{SIFT}. It constructs a scale space by convolving the image with Gaussian kernels at varying scales \( \sigma \), then computes the Difference of Gaussians (DoG) to identify extrema:
+
+\begin{equation}
+D(x, y, \sigma) = L(x, y, k\sigma) - L(x, y, \sigma)
+\end{equation}
+
+where \( L(x, y, \sigma) = G(x, y, \sigma) * I(x, y) \) is the Gaussian-blurred image, and \( G \) is the Gaussian kernel. Keypoints are detected as local extrema in the 3D scale space (x, y, \( \sigma \)). To ensure stability, low-contrast keypoints and edge responses are filtered using a contrast threshold and a curvature-based test. Each keypoint is assigned one or more orientations based on a histogram of gradient directions within a Gaussian-weighted patch, with peaks in the histogram defining the dominant orientations. The SIFT descriptor is a 128-dimensional vector formed by concatenating histograms of gradient orientations (8 bins) over a 4x4 spatial grid around the keypoint, normalized to achieve illumination invariance \cite{SIFT}. SIFT’s robustness to scale, rotation, and partial illumination changes makes it ideal for image matching and 3D reconstruction, but its computational complexity limits real-time use.
+
+\subsection{BRISK (Binary Robust Invariant Scalable Keypoints)}
+BRISK, introduced by Leutenegger et al., is a scale-invariant keypoint detector and binary descriptor optimized for speed and efficiency \cite{BRISK}. It constructs a scale pyramid by downsampling the image and applying Gaussian smoothing at each level. Keypoints are detected as maxima in a 3D scale space using a 9-16 pixel circular pattern, comparing the center pixel to its neighbors. The BRISK descriptor is a binary string generated by comparing intensities of predefined point pairs within a circular sampling pattern:
+
+\begin{equation}
+B_i = \begin{cases} 1 & I(p_i) < I(q_i) \\ 0 & \text{otherwise} \end{cases}
+\end{equation}
+
+where \( p_i \) and \( q_i \) are pixel pairs, and \( I \) is the intensity. BRISK uses short-distance pairs for noise robustness and long-distance pairs to estimate keypoint orientation via gradient averaging, ensuring rotation invariance. The circular pattern and binary comparisons enable fast computation and matching using Hamming distance, making BRISK suitable for resource-constrained environments \cite{BRISK}. While less robust than SIFT under extreme transformations, BRISK offers a good trade-off between speed and accuracy.
+
+\subsection{AGAST (Adaptive and Generic Accelerated Segment Test)}
+AGAST, proposed by Mair et al., is an enhanced version of FAST that improves detection speed and adaptability \cite{AGAST}. Like FAST, AGAST examines a 16-pixel circle around a candidate pixel \( p \), classifying it as a corner if \( N \) contiguous pixels are significantly brighter or darker than \( p \) by a threshold. AGAST introduces a decision tree-based approach that adapts the order of pixel comparisons dynamically based on the local image structure, learned via machine learning. This adaptive strategy optimizes the test sequence for each pixel, reducing the number of comparisons needed:
+
+\begin{equation}
+\text{Corner}(p) = \left| I_{x_i, y_i} - I_p \right| > t
+\end{equation}
+
+AGAST also generalizes FAST by supporting different circle radii and pixel configurations, making it versatile across various image types \cite{AGAST}. The algorithm retains FAST’s high speed while improving robustness to noise and corner detection accuracy. However, like FAST, it lacks inherent scale and rotation invariance, requiring integration with other methods (e.g., ORB) for such properties.
+
+\subsection{KAZE (Nonlinear Scale Space)}
+KAZE, developed by Alcantarilla et al., detects keypoints in a nonlinear scale space to preserve image details better than linear Gaussian scale spaces \cite{KAZE}. It employs the Perona-Malik anisotropic diffusion equation to construct the scale space:
+
+\begin{equation}
+\frac{\partial L inflation}{\partial t} = \text{div}(c(x, y, t) \cdot \nabla L)
+\end{equation}
+
+where \( L \) is the evolving image, and \( c(x, y, t) \) is a conductivity function that reduces diffusion near edges, preserving high-contrast features. Keypoints are detected as extrema in a Difference of Gaussians (DoG) applied to the nonlinear scale space. Descriptors are built using a modified SURF-like approach, computing gradient histograms in a grid around the keypoint, weighted by the scale. The nonlinear diffusion enhances robustness to noise and small deformations, making KAZE effective for matching under challenging conditions \cite{KAZE}. However, the computational cost of solving the diffusion equation limits its speed compared to FAST or ORB.
+
+\subsection{AKAZE (Accelerated KAZE)}
+AKAZE, an optimized version of KAZE, accelerates keypoint detection and description while maintaining robustness \cite{KAZE}. It uses Fast Explicit Diffusion (FED) to approximate the nonlinear scale space more efficiently than KAZE’s numerical solvers, reducing computation time. Keypoints are detected similarly to KAZE, using DoG in the nonlinear scale space. AKAZE introduces the Modified Local Difference Binary (MLDB) descriptor, a binary descriptor computed as:
+
+\begin{equation}
+\text{MLDB}(p) = \sum_{i=1}^{n} \text{sgn}(I(p_i) - I(q_i)) \cdot 2^i
+\end{equation}
+
+where \( p_i \) and \( q_i \) are pixel pairs in a sampling pattern, and \( \text{sgn} \) is the sign function. The MLDB descriptor is robust to rotation and scale changes, and its binary nature enables fast matching via Hamming distance \cite{KAZE}. AKAZE achieves a balance between KAZE’s robustness and the efficiency needed for real-time applications, making it suitable for tasks like image stitching and augmented reality.
+
+\section{Implementation}
+TODO
+
+\section{Results}
+TODO
+
+\section{Analysis}
+TODO
+
+\section{Conclusion}
+This benchmark identifies strengths and weaknesses across common corner detectors. For scale-invariant applications, SIFT or AKAZE are preferable. For real-time needs, ORB and BRISK balance speed and robustness well. Optimization is essential for consistent results.
+
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\begin{thebibliography}{1}
+
+    \bibitem{MDPI_Benchmark} 
+    J. Doe et al., "A Benchmark Dataset for Corner Detection," \textit{MDPI}, 2022. [Online]. Available: \url{https://www.mdpi.com/2076-3417/12/23/11984}.
+
+    \bibitem{OpenCV_Doc} 
+    OpenCV Documentation, \url{https://docs.opencv.org}. Accessed: 2025.
+
+    \bibitem{Harris_Corner} 
+    C. Harris and M. Stephens, "A Combined Corner and Edge Detector," in \textit{Proc. 4th Alvey Vision Conf.}, 1988.
+
+    \bibitem{Shi_Tomasi} 
+    J. Shi and C. Tomasi, "Good Features to Track," in \textit{Proc. IEEE Conf. Computer Vision and Pattern Recognition (CVPR)}, 1994.
+
+    \bibitem{FAST} 
+    E. Rosten and T. Drummond, "Fusing points and lines for high performance tracking," in \textit{Proc. IEEE Int. Conf. Computer Vision}, 2005.
+
+    \bibitem{ORB} 
+    E. Rublee, V. Rabaud, K. Konolige, and G. Bradski, "ORB: An Efficient Alternative to SIFT or SURF," in \textit{Proc. IEEE Int. Conf. Computer Vision}, 2011.
+
+    \bibitem{SIFT} 
+    D. G. Lowe, "Distinctive image features from scale-invariant keypoints," \textit{Int. J. Computer Vision}, 2004.
+
+    \bibitem{BRISK} 
+    L. Leutenegger, M. Chli, and R. Siegwart, "BRISK: Binary Robust Invariant Scalable Keypoints," in \textit{Proc. IEEE Int. Conf. Computer Vision}, 2011.
+
+    \bibitem{AGAST} 
+    M. Mair, A. A. Bartoli, and L. van Gool, "AGAST: Adaptive and Generic Accelerated Segment Test for Corner Detection," \textit{Pattern Recognition Letters}, 2011.
+
+    \bibitem{KAZE} 
+    P. Alcantarilla, A. Bartoli, and L. Van Gool, "KAZE Features," in \textit{Proc. European Conf. Computer Vision}, 2012.
+
+\end{thebibliography}
+
+\onecolumn
+\appendix
+
+\end{document}
