@@ -87,7 +87,7 @@ def run_benchmark(images, image_names, ground_truth_corners, output_path):
         "\\label{tab:optimal_parameters}",
         "\\begin{tabular}{lp{3.5cm}c}",
         "\\toprule",
-        "\\textbf{Algorithm} & \\textbf{Optimal Parameters} & \\textbf{Combinations Tested} \\\\",
+        "\\textbf{Algorithm} & \\textbf{Optimal Parameters} & \\textbf{$\\#$ Tests} \\\\",
         "\\midrule"
     ]
     
@@ -99,10 +99,9 @@ def run_benchmark(images, image_names, ground_truth_corners, output_path):
         optimized_params[alg_name] = best_params
         
         # Format parameters with newlines between them
-        param_str = "\\\\".join([f"{key.replace('_', '\\_')} = {value}" for key, value in best_params.items()])
+        param_str = "\\\\".join([f"{key.replace('_', '\\_')}: {value}" for key, value in best_params.items()])
         param_str2 = f"{alg_name} & \\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{\\parbox{{3.5cm}}{{\\raggedright {param_str}}}}} & \\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{{total_combinations}}} \\\\"
         param_report.append(param_str2)
-        # param_report.append(f"{alg_name} & \\multirow{{2}}{{*}}{{\\parbox{{3.5cm}}{{\\raggedright {param_str}}}}} & \\multirow{{2}}{{*}}{{{total_combinations}}} \\\\")
         param_report.append("& & \\\\")  # Empty row for multirow spanning
         if len(best_params.items()) > 2:
             for i in range(len(best_params.items())-2):

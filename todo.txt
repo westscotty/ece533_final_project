@@ -1,0 +1,3 @@
+- Need to get results for each algorithm separately, scoring against each other for each iteration vs each image
+- Also need to create larger testing matrix
+- Scale invariance test images

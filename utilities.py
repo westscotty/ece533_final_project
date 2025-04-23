@@ -114,10 +114,10 @@ def generate_comparison_tables(results, output_path):
         "\\centering",
         "\\caption{Comparison of Corner Detection Algorithms}",
         "\\label{tab:corner_detection_comparison}",
-        "\\begin{tabular}{|l|c|c|c|c|}",
-        "\\hline",
+        "\\begin{tabular}{lcccc}",
+        "\\toprule",
         "\\textbf{Algorithm} & \\textbf{Precision} & \\textbf{Recall} & \\textbf{Repeatability} & \\textbf{Speed (s)} \\\\",
-        "\\hline"
+        "\\midrule"
     ]
     
     for alg_name in results:
@@ -133,7 +133,7 @@ def generate_comparison_tables(results, output_path):
         table_content.append(row)
     
     table_content.extend([
-        "\\hline",
+        "\\bottomrule",
         "\\end{tabular}",
         "\\end{table}"
     ])
@@ -157,3 +157,4 @@ def visualize_results(ALGORITHMS, output_path):
     plt.tight_layout()
     plt.savefig(os.path.join(output_path, 'benchmark_results.png'))
     plt.close()
+    
