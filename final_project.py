@@ -80,19 +80,14 @@ def run_benchmark(images, image_names, ground_truth_corners, output_path):
     
     # Optimize parameters and benchmark for each algorithm
     param_report = [
-        "\\documentclass{article}",
-        "\\usepackage{booktabs}",
-        "\\usepackage{multirow}",  # Added for multirow support
-        "\\usepackage[margin=1in]{geometry}",
-        "\\begin{document}",
         "\\begin{table}[h]",
         "\\centering",
-        "\\small",  # Smaller font size
+        "\\small",
         "\\caption{Optimal Parameters for Corner Detection Algorithms}",
         "\\label{tab:optimal_parameters}",
-        "\\begin{tabular}{lp{3cm}c}",  # Reduced to p{3cm} for narrower column
+        "\\begin{tabular}{lp{3.5cm}c}",
         "\\toprule",
-        "\\textbf{Algorithm} & \\textbf{Optimal Parameters} & \\textbf{Combinations Tested} \\",
+        "\\textbf{Algorithm} & \\textbf{Optimal Parameters} & \\textbf{Combinations Tested} \\\\",
         "\\midrule"
     ]
     
@@ -103,10 +98,15 @@ def run_benchmark(images, image_names, ground_truth_corners, output_path):
         )
         optimized_params[alg_name] = best_params
         
-        # Format parameters as a compact string
-        param_str = ", ".join([f"{key.replace('_', '\\_')}={value}" for key, value in best_params.items()])
-        param_report.append(f"{alg_name} & \\multirow{{2}}{{*}}{{{param_str}}} & \\multirow{{2}}{{*}}{{{total_combinations}}} \\\\")
+        # Format parameters with newlines between them
+        param_str = "\\\\".join([f"{key.replace('_', '\\_')} = {value}" for key, value in best_params.items()])
+        param_str2 = f"{alg_name} & \\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{\\parbox{{3.5cm}}{{\\raggedright {param_str}}}}} & \\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{{total_combinations}}} \\\\"
+        param_report.append(param_str2)
+        # param_report.append(f"{alg_name} & \\multirow{{2}}{{*}}{{\\parbox{{3.5cm}}{{\\raggedright {param_str}}}}} & \\multirow{{2}}{{*}}{{{total_combinations}}} \\\\")
         param_report.append("& & \\\\")  # Empty row for multirow spanning
+        if len(best_params.items()) > 2:
+            for i in range(len(best_params.items())-2):
+                param_report.append("& & \\\\")
         
         # Benchmark with optimized parameters for this algorithm
         for img_idx, (image, gt_corners, name) in enumerate(zip(images, ground_truth_corners, image_names)):
@@ -132,8 +132,7 @@ def run_benchmark(images, image_names, ground_truth_corners, output_path):
     param_report.extend([
         "\\bottomrule",
         "\\end{tabular}",
-        "\\end{table}",
-        "\\end{document}"
+        "\\end{table}"
     ])
     
     # Save parameter report
