@@ -3,3 +3,4 @@ __pycache__/*
 reports/out/*
 *.log
 *.fdb_latexmk
+archive/*

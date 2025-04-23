@@ -20,7 +20,7 @@ def plot_ground_truth(images, image_names, ground_truth_corners, output_path):
             
     plt.tight_layout()
     plt.savefig(os.path.join(output_path, "ground_truth.png"))
-    plt.show()
+    plt.close()
 
 def create_scaled_images(image, scales=[0.5, 1.0, 2.0]):
     scaled_images = []
@@ -28,51 +28,6 @@ def create_scaled_images(image, scales=[0.5, 1.0, 2.0]):
         scaled = cv2.resize(image, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
         scaled_images.append(scaled)
     return scaled_images
-
-
-# def calculate_metrics(pred_corners, gt_corners, threshold=5.0):
-#     if len(gt_corners) == 0:
-#         return 0.0, 0.0, 0.0
-
-#     gt = gt_corners.astype(np.float32)
-#     pred = pred_corners.astype(np.float32)
-
-#     dists = cdist(gt, pred)  # shape: (num_gt, num_pred)
-#     matched_gt = np.any(dists <= threshold, axis=1)
-#     matched_pred = np.any(dists <= threshold, axis=0)
-
-#     TP = np.sum(matched_gt)
-#     FP = len(pred) - np.sum(matched_pred)
-#     FN = len(gt) - TP
-
-#     precision = TP / (TP + FP) if (TP + FP) > 0 else 0
-#     recall = TP / (TP + FN) if (TP + FN) > 0 else 0
-#     repeatability = TP / len(gt) if len(gt) > 0 else 0
-
-#     return precision, recall, repeatability
-
-# def calculate_metrics(detected_corners, gt_corners, threshold=5):
-#     if len(detected_corners) == 0 or len(gt_corners) == 0:
-#         return 0.0, 0.0, 0.0
-    
-#     # Convert to same format
-#     detected = detected_corners.astype(np.float32)
-#     gt = gt_corners.astype(np.float32)
-    
-#     # Create matches
-#     matches = []
-#     for det in detected:
-#         distances = np.sqrt(((gt - det) ** 2).sum(axis=1))
-#         if len(distances) > 0 and np.min(distances) < threshold:
-#             matches.append(1)
-#         else:
-#             matches.append(0)
-    
-#     precision = precision_score([1] * len(gt), matches, zero_division=0)
-#     recall = recall_score([1] * len(gt), matches, zero_division=0)
-#     repeatability = len([m for m in matches if m == 1]) / max(len(gt), 1)
-    
-#     return precision, recall, repeatability
 
 def calculate_metrics(pred_corners, gt_corners, threshold=5.0):
     gt = np.array(gt_corners, dtype=np.float32)
@@ -129,6 +84,64 @@ def optimize_parameters(algorithm, alg_name, image, gt_corners, PARAM_GRIDS):
             best_params = params
     
     return best_params
+
+def generate_sample_detections(images, image_names, ground_truth_corners, optimized_params, algorithms, output_path):
+    """Generate one sample image per algorithm with detected corners using optimal parameters."""
+    sample_output_path = os.path.join(output_path, "sample_detections")
+    os.makedirs(sample_output_path, exist_ok=True)
+    
+    # Use the first image as the representative sample
+    image = images[0]
+    name = image_names[0]
+    
+    for alg_name, alg_func in algorithms.items():
+        params = optimized_params[alg_name]
+        corners = alg_func(image, args=params)
+        
+        # Convert to color for visualization
+        img_color = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        for corner in corners:
+            cv2.circle(img_color, (int(corner[0]), int(corner[1])), 3, (0, 0, 255), -1)
+        
+        # Save image
+        cv2.imwrite(os.path.join(sample_output_path, f"{alg_name}_detected.png"), img_color)
+
+def generate_comparison_tables(results, output_path):
+    """Generate LaTeX table summarizing mean metrics per algorithm."""
+    metrics = ['precision', 'recall', 'repeatability', 'speed']
+    table_content = [
+        "\\begin{table}[h]",
+        "\\centering",
+        "\\caption{Comparison of Corner Detection Algorithms}",
+        "\\label{tab:corner_detection_comparison}",
+        "\\begin{tabular}{|l|c|c|c|c|}",
+        "\\hline",
+        "\\textbf{Algorithm} & \\textbf{Precision} & \\textbf{Recall} & \\textbf{Repeatability} & \\textbf{Speed (s)} \\\\",
+        "\\hline"
+    ]
+    
+    for alg_name in results:
+        row = f"{alg_name} "
+        for metric in metrics:
+            data = results[alg_name][metric]
+            mean_value = np.mean(data) if data else 0.0
+            if metric == 'speed':
+                row += f"& {mean_value:.4f} "
+            else:
+                row += f"& {mean_value:.3f} "
+        row += "\\\\"
+        table_content.append(row)
+    
+    table_content.extend([
+        "\\hline",
+        "\\end{tabular}",
+        "\\end{table}"
+    ])
+    
+    # Save table
+    table_path = os.path.join(output_path, "comparison_table.txt")
+    with open(table_path, 'w') as f:
+        f.write("\n".join(table_content))
 
 def visualize_results(ALGORITHMS, output_path):
     plt.figure(figsize=(15, 10))

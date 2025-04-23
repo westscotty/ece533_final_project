@@ -6,10 +6,12 @@ import matplotlib.pyplot as plt
 import scipy
 import argparse
 import time
+import itertools
+from tqdm import tqdm
 
 ## import custom scripts
 import corner_methods as cm
-from parameter_setup import ALGORITHMS, PARAM_GRIDS, image_path, ground_truth_path, output_path
+from parameters import ALGORITHMS, PARAM_GRIDS, image_path, ground_truth_path, output_path
 import utilities as utils
 
 def get_ground_truth(image_path, ground_truth_path, output_path, plot=True, images=None, image_names=None, ground_truth_corners=None):
@@ -17,6 +19,7 @@ def get_ground_truth(image_path, ground_truth_path, output_path, plot=True, imag
     images = images or []
     image_names = image_names or []
     ground_truth_corners = ground_truth_corners or []
+
     
     ## read in images and truth points
     for image in sorted(os.listdir(image_path)):
@@ -29,37 +32,86 @@ def get_ground_truth(image_path, ground_truth_path, output_path, plot=True, imag
         ground_truth_corners.append(coordinate_pairs)
         
     if plot:
+        if not os.path.isdir(output_path):
+            os.makedirs(output_path)
         utils.plot_ground_truth(images, image_names, ground_truth_corners, output_path)
     
     return images, image_names, ground_truth_corners
+
+def optimize_across_images(algorithm, alg_name, images, gt_corners_list, param_grid):
+    """Optimize parameters across all images for best combined accuracy."""
+    best_params = {}
+    best_score = -1
+    param_names = list(param_grid.keys())
+    param_values = list(param_grid.values())
     
-    
-def run_benchmark(images, image_names, ground_truth_corners, output_path):
-    """Run benchmarking for corner detection algorithms.
-    
-    Args:
-        images (list): List of grayscale images.
-        image_names (list): List of image names.
-        ground_truth_corners (list): List of ground truth corner coordinates.
-        output_path (str): Path to save results.
-    
-    Returns:
-        dict: Results dictionary with metrics for each algorithm.
-    """
-    results = {name: {'speed': [], 'precision': [], 'recall': [], 'repeatability': [], 'scale_invariance': []} for name in ALGORITHMS}
-    
-    for img_idx, (image, gt_corners, name) in enumerate(zip(images, ground_truth_corners, image_names)):
-        scaled_images = utils.create_scaled_images(image)
+    for combo in itertools.product(*param_values):
+        params = dict(zip(param_names, combo))
+        total_precision = 0
+        total_recall = 0
+        total_repeatability = 0
+        num_images = len(images)
         
-        for alg_name, alg_func in ALGORITHMS.items():
-            # Optimize parameters on first image
-            if img_idx == 0:
-                best_params = utils.optimize_parameters(alg_func, alg_name, image, gt_corners, PARAM_GRIDS)
-            else:
-                # Use default parameters (first value from each parameter list)
-                best_params = {k: v[0] for k, v in PARAM_GRIDS[alg_name].items()}
+        for image, gt_corners in zip(images, gt_corners_list):
+            corners = algorithm(image, args=params)
+            precision, recall, repeatability = utils.calculate_metrics(corners, gt_corners)
+            total_precision += precision
+            total_recall += recall
+            total_repeatability += repeatability
+        
+        avg_precision = total_precision / num_images
+        avg_recall = total_recall / num_images
+        avg_repeatability = total_repeatability / num_images
+        score = (avg_precision + avg_recall + avg_repeatability) / 3
+        
+        if score > best_score:
+            best_score = score
+            best_params = params
+    
+    # Calculate total combinations tested
+    total_combinations = np.prod([len(values) for values in param_values])
+    
+    return best_params, total_combinations
+
+def run_benchmark(images, image_names, ground_truth_corners, output_path):
+    """Run benchmarking for corner detection algorithms with optimized parameters."""
+    results = {name: {'speed': [], 'precision': [], 'recall': [], 'repeatability': [], 'scale_invariance': []} for name in ALGORITHMS}
+    optimized_params = {}
+    
+    # Optimize parameters and benchmark for each algorithm
+    param_report = [
+        "\\documentclass{article}",
+        "\\usepackage{booktabs}",
+        "\\usepackage{multirow}",  # Added for multirow support
+        "\\usepackage[margin=1in]{geometry}",
+        "\\begin{document}",
+        "\\begin{table}[h]",
+        "\\centering",
+        "\\small",  # Smaller font size
+        "\\caption{Optimal Parameters for Corner Detection Algorithms}",
+        "\\label{tab:optimal_parameters}",
+        "\\begin{tabular}{lp{3cm}c}",  # Reduced to p{3cm} for narrower column
+        "\\toprule",
+        "\\textbf{Algorithm} & \\textbf{Optimal Parameters} & \\textbf{Combinations Tested} \\",
+        "\\midrule"
+    ]
+    
+    for alg_name, alg_func in tqdm(ALGORITHMS.items()):
+        # Optimize parameters across all images
+        best_params, total_combinations = optimize_across_images(
+            alg_func, alg_name, images, ground_truth_corners, PARAM_GRIDS[alg_name]
+        )
+        optimized_params[alg_name] = best_params
+        
+        # Format parameters as a compact string
+        param_str = ", ".join([f"{key.replace('_', '\\_')}={value}" for key, value in best_params.items()])
+        param_report.append(f"{alg_name} & \\multirow{{2}}{{*}}{{{param_str}}} & \\multirow{{2}}{{*}}{{{total_combinations}}} \\\\")
+        param_report.append("& & \\\\")  # Empty row for multirow spanning
+        
+        # Benchmark with optimized parameters for this algorithm
+        for img_idx, (image, gt_corners, name) in enumerate(zip(images, ground_truth_corners, image_names)):
+            scaled_images = utils.create_scaled_images(image)
             
-            # Test across scales
             for scale_idx, scaled_img in enumerate(scaled_images):
                 start_time = time.time()
                 corners = alg_func(scaled_img, args=best_params)
@@ -75,15 +127,33 @@ def run_benchmark(images, image_names, ground_truth_corners, output_path):
                 results[alg_name]['recall'].append(recall)
                 results[alg_name]['repeatability'].append(repeatability)
                 results[alg_name]['scale_invariance'].append(repeatability if scale_idx != 1 else 0)
-
+    
+    # Finalize parameter report
+    param_report.extend([
+        "\\bottomrule",
+        "\\end{tabular}",
+        "\\end{table}",
+        "\\end{document}"
+    ])
+    
+    # Save parameter report
+    os.makedirs(output_path, exist_ok=True)
+    with open(os.path.join(output_path, "optimal_parameters.txt"), 'w') as f:
+        f.write("\n".join(param_report))
+    
+    # Generate sample detection images with optimized parameters
+    utils.generate_sample_detections(images, image_names, ground_truth_corners, optimized_params, ALGORITHMS, output_path)
+    
     # Save results
     os.makedirs(output_path, exist_ok=True)
     for alg_name in results:
         np.savez(os.path.join(output_path, f'{alg_name}_results.npz'), **results[alg_name])
     
-    return results
+    # Generate comparison tables
+    utils.generate_comparison_tables(results, output_path)
     
-    
+    return results, optimized_params
+
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='Benchmark corner detection algorithms.')
@@ -92,7 +162,6 @@ if __name__ == "__main__":
 
     np.random.seed(11001)
     images, image_names, ground_truth_corners = get_ground_truth(image_path, ground_truth_path, output_path, plot=args.plot)
-    results = run_benchmark(images, image_names, ground_truth_corners, output_path)
+    results, optimized_params = run_benchmark(images, image_names, ground_truth_corners, output_path)
     if args.plot:
         utils.visualize_results(ALGORITHMS, output_path)
-    

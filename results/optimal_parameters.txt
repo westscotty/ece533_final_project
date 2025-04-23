@@ -1,0 +1,36 @@
+\documentclass{article}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage[margin=1in]{geometry}
+\begin{document}
+\begin{table}[h]
+\centering
+\small
+\caption{Optimal Parameters for Corner Detection Algorithms}
+\label{tab:optimal_parameters}
+\begin{tabular}{lp{3cm}c}
+\toprule
+\textbf{Algorithm} & \textbf{Optimal Parameters} & \textbf{Combinations Tested} \
+\midrule
+Harris & \multirow{2}{*}{blockSize=5, ksize=3, k=0.04} & \multirow{2}{*}{27} \\
+& & \\
+Shi-Tomasi & \multirow{2}{*}{maxCorners=100, qualityLevel=0.01, minDistance=5} & \multirow{2}{*}{27} \\
+& & \\
+FAST & \multirow{2}{*}{threshold=10, type=2} & \multirow{2}{*}{9} \\
+& & \\
+ORB & \multirow{2}{*}{nfeatures=1000, scaleFactor=1.2, nlevels=8} & \multirow{2}{*}{8} \\
+& & \\
+SIFT & \multirow{2}{*}{nOctaveLayers=4, contrastThreshold=0.04, edgeThreshold=20} & \multirow{2}{*}{8} \\
+& & \\
+BRISK & \multirow{2}{*}{thresh=30, octaves=4} & \multirow{2}{*}{4} \\
+& & \\
+AGAST & \multirow{2}{*}{threshold=10, type=2} & \multirow{2}{*}{6} \\
+& & \\
+KAZE & \multirow{2}{*}{threshold=0.001, nOctaves=4} & \multirow{2}{*}{4} \\
+& & \\
+AKAZE & \multirow{2}{*}{threshold=0.001, nOctaves=4} & \multirow{2}{*}{4} \\
+& & \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{document}
