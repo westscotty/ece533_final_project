@@ -5,6 +5,8 @@ from itertools import product
 import matplotlib.pyplot as plt
 import os
 from scipy.spatial.distance import cdist
+from tqdm import tqdm
+from parameters import PARAM_REPORT, ALGORITHMS
 
 def plot_ground_truth(images, image_names, ground_truth_corners, output_path):
     
@@ -23,6 +25,7 @@ def plot_ground_truth(images, image_names, ground_truth_corners, output_path):
     plt.close()
 
 def create_scaled_images(image, scales=[0.5, 1.0, 2.0]):
+    """Create scaled versions of the image."""
     scaled_images = []
     for scale in scales:
         scaled = cv2.resize(image, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
@@ -106,8 +109,71 @@ def generate_sample_detections(images, image_names, ground_truth_corners, optimi
         # Save image
         cv2.imwrite(os.path.join(sample_output_path, f"{alg_name}_detected.png"), img_color)
 
+# def plot_individual_results(individual_results, image_names, output_path):
+#     """Generate plots for individual results per algorithm and image."""
+#     plot_output_path = os.path.join(output_path, "individual_result_plots")
+#     os.makedirs(plot_output_path, exist_ok=True)
+    
+#     metrics = ['speed', 'precision', 'recall', 'repeatability']
+    
+#     for alg_name in individual_results:
+#         for img_name in image_names:
+#             plt.figure(figsize=(15, 10))
+#             plt.suptitle(f crab time"{alg_name} on Image {img_name}")
+            
+#             for idx, metric in enumerate(metrics):
+#                 plt.subplot(2, 2, idx + 1)
+#                 data = individual_results[alg_name][img_name][metric]
+#                 plt.plot([0], data, marker='o', label=f"Image {img_name}")
+#                 plt.title(metric.capitalize())
+#                 plt.xlabel('Trial')
+#                 plt.ylabel(metric.capitalize())
+#                 if metric != 'speed':
+#                     plt.ylim(0, 1)
+#                 else:
+#                     plt.ylim(0, max(data) * 1.2 if max(data) > 0 else 1)
+            
+#             plt.tight_layout(rect=[0, 0, 1, 0.95])
+#             plt.savefig(os.path.join(plot_output_path, f"{alg_name}_{img_name}_metrics.png"))
+#             plt.close()
+
+def plot_pairwise_metrics(results, output_path):
+    """Generate a scatter matrix plot for each algorithm showing pairwise relationships between metrics."""
+    plot_output_path = os.path.join(output_path, "pairwise_metric_plots")
+    os.makedirs(plot_output_path, exist_ok=True)
+    
+    metrics = ['speed', 'precision', 'recall', 'repeatability']
+    
+    for alg_name in results:
+        fig, axes = plt.subplots(4, 4, figsize=(12, 12))
+        fig.suptitle(f"{alg_name} Pairwise Metrics")
+        
+        data = {metric: results[alg_name][metric] for metric in metrics}
+        
+        for i, metric1 in enumerate(metrics):
+            for j, metric2 in enumerate(metrics):
+                ax = axes[i, j]
+                if i == j:
+                    ax.hist(data[metric1], bins=20, color='skyblue', edgecolor='black')
+                    ax.set_xlabel(metric1.capitalize())
+                    ax.set_ylabel('Frequency')
+                else:
+                    ax.scatter(data[metric2], data[metric1], alpha=0.5, s=10)
+                    ax.set_xlabel(metric2.capitalize())
+                    ax.set_ylabel(metric1.capitalize())
+                    if metric1 != 'speed':
+                        ax.set_ylim(0, 1)
+                    if metric2 != 'speed':
+                        ax.set_xlim(0, 1)
+                
+                ax.tick_params(axis='both', which='major', labelsize=8)
+        
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        plt.savefig(os.path.join(plot_output_path, f"{alg_name}_pairwise_metrics.png"))
+        plt.close()
+
 def generate_comparison_tables(results, output_path):
-    """Generate LaTeX table summarizing mean metrics per algorithm."""
+    """Generate LaTeX tables summarizing mean metrics and individual image metrics per algorithm."""
     metrics = ['precision', 'recall', 'repeatability', 'speed']
     table_content = [
         "\\begin{table}[h]",
@@ -138,7 +204,6 @@ def generate_comparison_tables(results, output_path):
         "\\end{table}"
     ])
     
-    # Save table
     table_path = os.path.join(output_path, "comparison_table.txt")
     with open(table_path, 'w') as f:
         f.write("\n".join(table_content))
@@ -146,10 +211,10 @@ def generate_comparison_tables(results, output_path):
 def visualize_results(ALGORITHMS, output_path):
     plt.figure(figsize=(15, 10))
     
-    for idx, metric in enumerate(['speed', 'precision', 'recall', 'repeatability', 'scale_invariance']):
-        plt.subplot(2, 3, idx + 1)
+    for idx, metric in enumerate(['speed', 'precision', 'recall', 'repeatability']):
+        plt.subplot(2, 2, idx + 1)
         for alg_name in ALGORITHMS:
-            data = np.load(os.path.join(output_path, f'{alg_name}_results.npz'))[metric]
+            data = np.load(os.path.join(output_path, f'data/{alg_name}_results.npz'))[metric]
             plt.plot(data, label=alg_name)
         plt.title(metric.capitalize())
         plt.legend()
@@ -157,4 +222,135 @@ def visualize_results(ALGORITHMS, output_path):
     plt.tight_layout()
     plt.savefig(os.path.join(output_path, 'benchmark_results.png'))
     plt.close()
+
+def plot_best_combination(individual_results, image_names, output_path):
+    """Plot the metrics of the best parameter combination for each algorithm across images."""
+    plot_output_path = os.path.join(output_path, "best_combination_plots")
+    os.makedirs(plot_output_path, exist_ok=True)
     
+    metrics = ['speed', 'precision', 'recall', 'repeatability']
+    
+    for alg_name in individual_results:
+        plt.figure(figsize=(12, 8))
+        plt.suptitle(f"Best Combination Metrics for {alg_name}")
+        
+        for idx, metric in enumerate(metrics):
+            plt.subplot(2, 2, idx + 1)
+            # Gather metric data across all images
+            metric_data = [individual_results[alg_name][img_name][metric][0] for img_name in image_names]
+            plt.plot(image_names, metric_data, marker='o', label=alg_name)
+            plt.title(metric.capitalize())
+            plt.xlabel('Image Name')
+            plt.ylabel(metric.capitalize())
+            plt.xticks(rotation=45)
+            if metric != 'speed':
+                plt.ylim(0, 1)
+            else:
+                plt.ylim(0, max(metric_data) * 1.2 if max(metric_data) > 0 else 1)
+            plt.legend()
+        
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        plt.savefig(os.path.join(plot_output_path, f"{alg_name}_best_combination.png"))
+        plt.close()
+
+def plot_all_combinations(all_metrics_per_algorithm, image_names, output_path):
+    """Plot the performance of all parameter combinations for each algorithm, highlighting the best combination."""
+    plot_output_path = os.path.join(output_path, "all_combinations_plots")
+    os.makedirs(plot_output_path, exist_ok=True)
+    
+    metrics = ['speed', 'precision', 'recall', 'repeatability']
+    
+    for alg_name in all_metrics_per_algorithm:
+        all_metrics = all_metrics_per_algorithm[alg_name]
+        # Find the best combination (highest score)
+        best_idx = np.argmax([m['score'] for m in all_metrics])
+        
+        plt.figure(figsize=(12, 8))
+        plt.suptitle(f"All Parameter Combinations for {alg_name}")
+        
+        for idx, metric in enumerate(metrics):
+            plt.subplot(2, 2, idx + 1)
+            
+            # Plot all combinations with transparency
+            for combo_idx, metrics_dict in enumerate(all_metrics):
+                metric_data = metrics_dict[metric]
+                if combo_idx == best_idx:
+                    # Highlight the best combination with a bold line
+                    plt.plot(image_names, metric_data, marker='o', color='red', linewidth=2, label='Best Combination')
+                else:
+                    # Plot other combinations with transparency
+                    plt.plot(image_names, metric_data, marker='o', alpha=0.3, color='blue', label='Other Combinations' if combo_idx == 0 else "")
+            
+            plt.title(metric.capitalize())
+            plt.xlabel('Image Name')
+            plt.ylabel(metric.capitalize())
+            plt.xticks(rotation=45)
+            if metric != 'speed':
+                plt.ylim(0, 1)
+            else:
+                all_speeds = [max(metrics_dict['speed']) for metrics_dict in all_metrics]
+                plt.ylim(0, max(all_speeds) * 1.2 if max(all_speeds) > 0 else 1)
+            plt.legend()
+        
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        plt.savefig(os.path.join(plot_output_path, f"{alg_name}_all_combinations.png"))
+        plt.close()
+
+def plot_scale_invariance(scale_results, image_names, output_path):
+    """Plot the scale invariance results for each algorithm, showing metrics across scales for each image."""
+    plot_output_path = os.path.join(output_path, "scale_invariance_plots")
+    os.makedirs(plot_output_path, exist_ok=True)
+    
+    metrics = ['speed', 'precision', 'recall', 'repeatability']
+    scale_labels = ['0.5x', '1.0x', '2.0x']
+    
+    for alg_name in scale_results:
+        plt.figure(figsize=(15, 10))
+        # Compute average scale invariance score across all images
+        avg_scale_invariance = np.mean([scale_results[alg_name][img_name]['scale_invariance'] for img_name in image_names])
+        plt.suptitle(f"Scale Invariance Test for {alg_name} (Avg Scale Invariance: {avg_scale_invariance:.3f})")
+        
+        for idx, metric in enumerate(metrics):
+            plt.subplot(2, 2, idx + 1)
+            
+            # Plot a line for each image across scales
+            for img_idx, img_name in enumerate(image_names):
+                metric_data = scale_results[alg_name][img_name][metric]
+                plt.plot(scale_labels, metric_data, marker='o', label=f"Image {img_name}")
+            
+            plt.title(metric.capitalize())
+            plt.xlabel('Scale')
+            plt.ylabel(metric.capitalize())
+            if metric != 'speed':
+                plt.ylim(0, 1)
+            else:
+                all_speeds = [max(scale_results[alg_name][img_name]['speed']) for img_name in image_names]
+                plt.ylim(0, max(all_speeds) * 1.2 if max(all_speeds) > 0 else 1)
+            # plt.legend()
+        
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        plt.savefig(os.path.join(plot_output_path, f"{alg_name}_scale_invariance.png"))
+        plt.close()
+
+def generate_param_report(params, combinations, output_path):
+    param_report = PARAM_REPORT
+    for i, (alg_name, alg_func) in enumerate(ALGORITHMS.items()):
+        best_params = params[i]
+        total_combinations = combinations[i]
+        
+        param_str = "\\\\".join([f"{key.replace('_', '\\_')}: {value}" for key, value in best_params.items()])
+        param_str2 = f"{alg_name} & \\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{\\parbox{{3.5cm}}{{\\raggedright {param_str}}}}} & \\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{{total_combinations}}} \\\\"
+        param_report.append(param_str2)
+        param_report.append("& & \\\\")
+        
+        if len(best_params.items()) > 2:
+            for i in range(len(best_params.items())-2):
+                param_report.append("& & \\\\")
+                    
+    param_report.extend([
+        "\\bottomrule",
+        "\\end{tabular}",
+        "\\end{table}"
+    ]) 
+    with open(os.path.join(output_path, "optimal_parameters.txt"), 'w') as f:
+        f.write("\n".join(param_report))

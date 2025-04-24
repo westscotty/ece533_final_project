@@ -60,3 +60,15 @@ PARAM_GRIDS = {
         'nOctaves': [4, 5]
     }
 }
+
+PARAM_REPORT = [
+    "\\begin{table}[h]",
+    "\\centering",
+    "\\small",
+    "\\caption{Optimal Parameters for Corner Detection Algorithms}",
+    "\\label{tab:optimal_parameters}",
+    "\\begin{tabular}{lp{3.5cm}c}",
+    "\\toprule",
+    "\\textbf{Algorithm} & \\textbf{Optimal Parameters} & \\textbf{$\\#$ Tests} \\\\",
+    "\\midrule"
+]
