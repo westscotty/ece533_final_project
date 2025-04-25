@@ -49,6 +49,7 @@ def calculate_metrics(pred_corners, gt_corners, threshold=5.0):
 
     # Overall corner quantity (total number of detected corners)
     corner_quantity = len(pred)
+    corner_quantity_ratio = len(gt) / len(pred) ## ground_truth / predicted
 
     # Early return if either side has no corners
     if len(gt) == 0 or len(pred) == 0:
@@ -79,30 +80,7 @@ def calculate_metrics(pred_corners, gt_corners, threshold=5.0):
         matched_dists = min_dists[matched_gt]  # Distances for matched ground truth corners
         localization_error = np.mean(matched_dists) if len(matched_dists) > 0 else 0.0
 
-    return precision, recall, repeatability, f_score, apr, localization_error, corner_quantity
-
-def optimize_parameters(algorithm, alg_name, image, gt_corners, PARAM_GRIDS):
-    best_params = {}
-    best_score = -1
-    param_grid = PARAM_GRIDS.get(alg_name, {})
-    
-    # Generate all parameter combinations
-    param_names = list(param_grid.keys())
-    param_values = list(param_grid.values())
-    for combo in product(*param_values):
-        params = dict(zip(param_names, combo))
-        
-        # Call the algorithm wrapper with parameters
-        corners = algorithm(image, args=params)
-        
-        precision, recall, repeatability, f_score, apr, localization_error, corner_quantity = calculate_metrics(corners, gt_corners)
-        score = (precision + recall + repeatability + f_score + apr + localization_error) / 6
-    
-        if score > best_score:
-            best_score = score
-            best_params = params
-    
-    return best_params
+    return precision, recall, repeatability, f_score, apr, localization_error, corner_quantity, corner_quantity_ratio
 
 
 def generate_sample_detections(images, image_names, ground_truth_corners, optimized_params, algorithms, output_path):
@@ -280,7 +258,7 @@ def plot_best_combination(individual_results, image_names, output_path):
             if metric not in ['speed', 'localization_error', 'corner_quantity']:
                 plt.ylim(0, 1)
             else:
-                plt.ylim(0, max(metric_data) * 1.2 if max(metric_data) > 0 else 1)
+                plt.ylim(0, np.max(metric_data) * 1.2 if np.max(metric_data) > 0 else 1)
             plt.legend(loc="upper right")
         
         plt.tight_layout(rect=[0, 0, 1, 0.95])
@@ -322,8 +300,8 @@ def plot_all_combinations(all_metrics_per_algorithm, image_names, output_path):
             if metric not in ['speed', 'localization_error', 'corner_quantity']:
                 plt.ylim(0, 1)
             else:
-                all_values = [max(metrics_dict[metric]) for metrics_dict in all_metrics]
-                plt.ylim(0, max(all_values) * 1.2 if max(all_values) > 0 else 1)
+                all_values = [np.max(metrics_dict[metric]) for metrics_dict in all_metrics]
+                plt.ylim(0, np.max(all_values) * 1.2 if np.max(all_values) > 0 else 1)
             plt.legend(loc="upper right")
         
         plt.tight_layout(rect=[0, 0, 1, 0.95])
@@ -358,8 +336,8 @@ def plot_scale_invariance(scale_results, image_names, output_path):
             if metric not in ['speed', 'localization_error', 'corner_quantity']:
                 plt.ylim(0, 1)
             else:
-                all_values = [max(scale_results[alg_name][img_name][metric]) for img_name in image_names]
-                plt.ylim(0, max(all_values) * 1.2 if max(all_values) > 0 else 1)
+                all_values = [np.max(scale_results[alg_name][img_name][metric]) for img_name in image_names]
+                plt.ylim(0, np.max(all_values) * 1.2 if np.max(all_values) > 0 else 1)
             # plt.legend(loc="upper right")
         
         plt.tight_layout(rect=[0, 0, 1, 0.95])

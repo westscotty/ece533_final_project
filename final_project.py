@@ -59,12 +59,13 @@ def optimize_across_images(algorithm, images, gt_corners_list, param_grid):
         aprs = []
         localization_errors = []
         corner_quantities = []
+        corner_quantity_ratios = []
         
         for image, gt_corners in zip(images, gt_corners_list):
             start_time = time.time()
             corners = algorithm(image, args=params)
             exec_time = time.time() - start_time
-            precision, recall, repeatability, f_score, apr, localization_error, corner_quantity = utils.calculate_metrics(corners, gt_corners)
+            precision, recall, repeatability, f_score, apr, localization_error, corner_quantity, corner_quantity_ratio = utils.calculate_metrics(corners, gt_corners)
             
             speeds.append(exec_time)
             precisions.append(precision)
@@ -74,13 +75,16 @@ def optimize_across_images(algorithm, images, gt_corners_list, param_grid):
             aprs.append(apr)
             localization_errors.append(localization_error)
             corner_quantities.append(corner_quantity)
+            corner_quantity_ratios.append(corner_quantity_ratio)
             
         # Normalize speed to [0, 1] for scoring (lower speed is better, so invert it)
-        max_speed = max(speeds) if speeds else 1.0
-        normalized_speeds = [1 - (speed / max_speed) if max_speed > 0 else 1.0 for speed in speeds]
+        speed_norm = np.max(speeds) if speeds else 1.0
+        if speed_norm > np.mean(speeds) + 4 * np.std(speeds):
+            speed_norm = np.mean(speeds) + 4 * np.std(speeds)
+        normalized_speeds = [1 - (speed / speed_norm) if speed_norm > 0 else 1.0 for speed in speeds]
         
         # Normalize localization error to [0, 1] for scoring (lower is better, so invert it)
-        max_le = max(localization_errors) if localization_errors and max(localization_errors) > 0 else 1.0
+        max_le = np.max(localization_errors) if localization_errors and np.max(localization_errors) > 0 else 1.0
         normalized_le = [1 - (le / max_le) if max_le > 0 else 1.0 for le in localization_errors]
         
         # Compute average metrics
@@ -91,9 +95,10 @@ def optimize_across_images(algorithm, images, gt_corners_list, param_grid):
         avg_f_score = np.mean(f_scores)
         avg_apr = np.mean(aprs)
         avg_le = np.mean(normalized_le)
+        avg_corner_quant_ratios = np.mean(corner_quantity_ratios)
         
         # Score is the average of the normalized metrics (excluding corner_quantity since it's not part of optimization)
-        score = (avg_speed + avg_precision + avg_recall + avg_repeatability + avg_f_score + avg_apr + avg_le) / 7
+        score = (avg_speed * (2/10) + avg_precision * (2/10) + avg_recall * (2/10) + avg_repeatability * (1/10) + avg_le * (2/10) + avg_corner_quant_ratios * (1/10))
         
         # Store metrics for this combination
         all_metrics.append({
@@ -106,6 +111,7 @@ def optimize_across_images(algorithm, images, gt_corners_list, param_grid):
             'apr': aprs,
             'localization_error': localization_errors,
             'corner_quantity': corner_quantities,
+            'corner_quantity_ratio': corner_quantity_ratios,
             'score': score
         })
         
@@ -119,7 +125,7 @@ def test_scale_invariance(images, image_names, ground_truth_corners, optimized_p
 
     scale_results = {name: {img_name: {
         'speed': [], 'precision': [], 'recall': [], 'repeatability': [], 'f_score': [], 'apr': [],
-        'localization_error': [], 'corner_quantity': [], 'scale_invariance': 0.0
+        'localization_error': [], 'corner_quantity': [], 'corner_quantity_ratio': [], 'scale_invariance': 0.0
     } for img_name in image_names} for name in ALGORITHMS}
         
     # Select a random image for sample visualization
@@ -145,7 +151,7 @@ def test_scale_invariance(images, image_names, ground_truth_corners, optimized_p
                 # Adjust ground truth for scale
                 scaled_gt = gt_corners * SCALES[scale_idx]
                 
-                precision, recall, repeatability, f_score, apr, localization_error, corner_quantity = utils.calculate_metrics(corners, scaled_gt)
+                precision, recall, repeatability, f_score, apr, localization_error, corner_quantity, corner_quantity_ratio = utils.calculate_metrics(corners, scaled_gt)
                 
                 # Store results for this scale
                 scale_results[alg_name][name]['speed'].append(exec_time)
@@ -156,6 +162,7 @@ def test_scale_invariance(images, image_names, ground_truth_corners, optimized_p
                 scale_results[alg_name][name]['apr'].append(apr)
                 scale_results[alg_name][name]['localization_error'].append(localization_error)
                 scale_results[alg_name][name]['corner_quantity'].append(corner_quantity)
+                scale_results[alg_name][name]['corner_quantity_ratio'].append(corner_quantity_ratio)
                 
                 repeatabilities.append(repeatability)
                 
@@ -185,11 +192,11 @@ def run_benchmarking(images, image_names, ground_truth_corners):
 
     results = {name: {
         'speed': [], 'precision': [], 'recall': [], 'repeatability': [], 'f_score': [], 'apr': [],
-        'localization_error': [], 'corner_quantity': []
+        'localization_error': [], 'corner_quantity': [], 'corner_quantity_ratio': []
     } for name in ALGORITHMS}
     individual_results = {name: {img_name: {
         'speed': [], 'precision': [], 'recall': [], 'repeatability': [], 'f_score': [], 'apr': [],
-        'localization_error': [], 'corner_quantity': []
+        'localization_error': [], 'corner_quantity': [], 'corner_quantity_ratio': []
     } for img_name in image_names} for name in ALGORITHMS}
     optimized_params = {}
     all_metrics_per_algorithm = {}  # Store all metrics for each parameter combination per algorithm
@@ -212,7 +219,7 @@ def run_benchmarking(images, image_names, ground_truth_corners):
             corners = alg_func(image, args=best_params)
             exec_time = time.time() - start_time
             
-            precision, recall, repeatability, f_score, apr, localization_error, corner_quantity = utils.calculate_metrics(corners, gt_corners)
+            precision, recall, repeatability, f_score, apr, localization_error, corner_quantity, corner_quantity_ratio = utils.calculate_metrics(corners, gt_corners)
             
             # Store aggregated results
             results[alg_name]['speed'].append(exec_time)
@@ -223,6 +230,7 @@ def run_benchmarking(images, image_names, ground_truth_corners):
             results[alg_name]['apr'].append(apr)
             results[alg_name]['localization_error'].append(localization_error)
             results[alg_name]['corner_quantity'].append(corner_quantity)
+            results[alg_name]['corner_quantity_ratio'].append(corner_quantity_ratio)
             
             # Store individual results
             individual_results[alg_name][name]['speed'].append(exec_time)
@@ -233,6 +241,7 @@ def run_benchmarking(images, image_names, ground_truth_corners):
             individual_results[alg_name][name]['apr'].append(apr)
             individual_results[alg_name][name]['localization_error'].append(localization_error)
             individual_results[alg_name][name]['corner_quantity'].append(corner_quantity)
+            individual_results[alg_name][name]['corner_quantity_ratio'].append(corner_quantity_ratio)
     
     return results, optimized_params, individual_results, params, combinations, all_metrics_per_algorithm
 
