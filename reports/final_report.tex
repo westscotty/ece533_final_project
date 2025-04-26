@@ -1176,7 +1176,7 @@ def optimize_across_images(algorithm, alg_name, images, gt_corners_list, param_g
         
         # Score is the average of the normalized metrics (excluding corner_quantity since it's not part of optimization)
         # weights = np.array([2/12, 3/12, 3/12, 1/12, 2/12, 1/12])
-        vars = np.array([avg_speed, avg_precision, avg_recall, avg_repeatability, avg_le, avg_corner_quant_ratios])
+        vars = np.array([avg_speed, avg_precision, avg_recall, avg_repeatability, avg_le]) #, avg_corner_quant_ratios])
         # score = np.sum(vars * weights)
         score = np.sum(vars) / len(vars)
         
@@ -1334,10 +1334,7 @@ if __name__ == "__main__":
     print("Loading Ground Truth ...")
     images, image_names, ground_truth_corners = get_ground_truth(image_path, ground_truth_path, output_path)
     results, optimized_params, individual_results, params, combinations, scores, all_metrics_per_algorithm = run_benchmarking(images, image_names, ground_truth_corners)
-    
-    # Run scale invariance test
-    scale_results = test_scale_invariance(images, image_names, ground_truth_corners, optimized_params)
-        
+
     # Generate sample detection images with optimized parameters
     print("Creating Sample Imagery for Optimized Algorithms ...")
     utils.generate_sample_detections(images, image_names, ground_truth_corners, optimized_params, ALGORITHMS, output_path)
@@ -1361,7 +1358,11 @@ if __name__ == "__main__":
     # utils.plot_pairwise_metrics(results, output_path)
     utils.plot_best_combination(individual_results, image_names, output_path)
     utils.plot_all_combinations(all_metrics_per_algorithm, image_names, output_path)
+    
+    # Run scale invariance test
+    scale_results = test_scale_invariance(images, image_names, ground_truth_corners, optimized_params)
     utils.plot_scale_invariance(scale_results, image_names, output_path)
+    utils.generate_scale_invariance_table(scale_results, output_path)
 \end{lstlisting}
 \bigskip
 \bigskip
@@ -1377,8 +1378,8 @@ output_path = os.path.join(os.getcwd(), "results")
 
 SCALES = [0.25, 1.0, 4.0]  # Scales to test
 
-N_SAMPLES = 5
-MAX_SAMPLES = 250
+N_SAMPLES = 15
+MAX_SAMPLES = 1000
 SEED = 11001
 
 ALGORITHMS = {
@@ -1466,7 +1467,7 @@ PARAM_GRIDS = {
 }
 
 PARAM_REPORT = [
-    "\\begin{table}",
+    "\\begin{table}[h]",
     "\\centering",
     "\\small",
     "\\caption{Optimal Parameters for Corner Detection Algorithms}",
@@ -1490,10 +1491,11 @@ class UniformDist:
         self.is_int = is_int
 
     def sample(self, n_samples):
-        samples = np.random.uniform(self.min_val, self.max_val, n_samples)
+        samples = np.round(np.random.uniform(self.min_val, self.max_val, n_samples), 4)
         if self.is_int:
             samples = np.round(samples).astype(int)
             samples = np.clip(samples, self.min_val, self.max_val)
+            
         return np.unique(samples)[:n_samples]  # Ensure unique samples
 
 class NormalDist:
@@ -1507,7 +1509,7 @@ class NormalDist:
     def sample(self, n_samples):
         samples = np.random.normal(self.mean, self.std, n_samples)
         if self.min_val is not None or self.max_val is not None:
-            samples = np.clip(samples, self.min_val or -np.inf, self.max_val or np.inf)
+            samples = np.round(np.clip(samples, self.min_val or -np.inf, self.max_val or np.inf), 4)
         if self.is_int:
             samples = np.round(samples).astype(int)
             samples = np.clip(samples, self.min_val or -np.inf, self.max_val or np.inf)
@@ -1695,9 +1697,9 @@ def calculate_metrics(pred_corners, gt_corners, threshold=5.0):
 
     return precision, recall, repeatability, f_score, apr, localization_error, corner_quantity, corner_quantity_ratio
 
-
+        
 def generate_sample_detections(images, image_names, ground_truth_corners, optimized_params, algorithms, output_path):
-    """Generate one sample image per algorithm with detected corners using optimal parameters."""
+
     sample_output_path = os.path.join(output_path, "sample_detections")
     os.makedirs(sample_output_path, exist_ok=True)
     
@@ -1706,51 +1708,77 @@ def generate_sample_detections(images, image_names, ground_truth_corners, optimi
     name = image_names[idx]
     
     for alg_name, alg_func in algorithms.items():
-
         params = optimized_params[alg_name]
         corners = alg_func(image, args=params)
         gt_corners = ground_truth_corners[idx]
         
-        plt.figure(figsize=(6, 6))
-        plt.title(f"Sample Detection for {alg_name} (Image {name})")
+        plt.figure(figsize=(4, 8))  # Adjusted for 1x2 grid
+        plt.suptitle(f"Sample Detection: {alg_name} (Image {name})", fontsize=12)
+        
+        # Ground truth subplot (left column)
+        plt.subplot(2, 1, 1)
         plt.imshow(image, cmap="gray")
+        plt.title(f"Ground Truth (x{len(gt_corners)})", fontsize=10)
         plt.axis("off")
         
         # Plot ground truth corners
         for corner in gt_corners:
-            plt.scatter(corner[1], corner[0], c='blue', marker='o', s=10, label='Ground Truth')
-            
-        # Plot detected corners
-        for corner in corners:
-            plt.scatter(corner[0], corner[1], c='red', marker='x', s=5, label='Detected')
+            plt.scatter(corner[1], corner[0], c='blue', marker='o', s=15, label='Ground Truth')
         
-        # plt.legend()
-        plt.tight_layout()
+        # Detected corners subplot (right column)
+        plt.subplot(2, 1, 2)
+        plt.imshow(image, cmap="gray")
+        plt.title(f"Detected (x{len(corners)})", fontsize=10)
+        plt.axis("off")
+        
+        # Plot detected corners
+        size = 15
+        if len(corners) > 500:
+            size = 5
+        for corner in corners:
+            plt.scatter(corner[0], corner[1], c='red', marker='o', s=size, label='Detected')
+        
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
         plt.savefig(os.path.join(sample_output_path, f"{alg_name}_detected.png"))
         plt.close()
         
         
 def generate_scale_invariance_samples(scaled_images, detected_corners, gt_corners, alg_name, image_name, output_path):
+    
     sample_output_path = os.path.join(output_path, "scale_invariance_samples")
     os.makedirs(sample_output_path, exist_ok=True)
     
-    plt.figure(figsize=(6, 9))
-    plt.suptitle(f"Scale Invariance Sample for {alg_name} (Image {image_name})")
+    plt.figure(figsize=(8, 12))  # Adjusted for 3x2 grid
+    plt.suptitle(f"Scale Invariance Sample: {alg_name} (Image {image_name})", fontsize=12)
     
     for i, (scale, image, corners) in enumerate(zip(SCALES, scaled_images, detected_corners)):
-        plt.subplot(3, 1, i + 1)
+        # Ground truth subplot (left column, i.e., subplot 1, 3, 5)
+        plt.subplot(3, 2, 2 * i + 1)
         plt.imshow(image, cmap="gray")
-        plt.title(f"Scale {scale}")
+        plt.title(f"Ground Truth (x{len(gt_corners)}) (Scale {scale})", fontsize=10)
         plt.axis("off")
         
         # Plot ground truth corners (adjusted for scale)
         scaled_gt = gt_corners * scale
         for corner in scaled_gt:
-            plt.scatter(corner[1], corner[0], c='blue', marker='o', s=10, label='Ground Truth' if i == 0 else "")
-
+            plt.scatter(corner[1], corner[0], c='blue', marker='o', s=15, label='Ground Truth' if i == 0 else "")
+        
+        # Detected corners subplot (right column, i.e., subplot 2, 4, 6)
+        plt.subplot(3, 2, 2 * i + 2)
+        plt.imshow(image, cmap="gray")
+        plt.title(f"Detected (x{len(corners)}) (Scale {scale})", fontsize=10)
+        plt.axis("off")
+        
+        size = 15
+        if len(corners) > 500:
+            size = 5
+        
+        if scale < 1:
+            size = 5
         # Plot detected corners
         for corner in corners:
-            plt.scatter(corner[0], corner[1], c='red', marker='x', s=5, label='Detected' if i == 0 else "")       
+            plt.scatter(corner[0], corner[1], c='red', marker='o', s=size, label='Detected' if i == 0 else "")
+        
     
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     plt.savefig(os.path.join(sample_output_path, f"{alg_name}_scale_invariance_sample.png"))
@@ -1758,15 +1786,15 @@ def generate_scale_invariance_samples(scaled_images, detected_corners, gt_corner
     
 
 def generate_comparison_tables(results, output_path):
-    metrics = ['precision', 'recall', 'repeatability', 'speed', 'f_score', 'apr', 'localization_error', 'corner_quantity', 'corner_quantity_ratio']
+    metrics = ['precision', 'recall', 'repeatability', 'speed', 'f_score', 'apr', 'localization_error', 'corner_quantity_ratio']
     table_content = [
-        "\\begin{table}",
+        "\\begin{table}[h]",
         "\\centering",
         "\\caption{Comparison of Corner Detection Algorithms}",
         "\\label{tab:corner_detection_comparison}",
         "\\begin{tabular}{lcccccccc}",
         "\\toprule",
-        "\\textbf{Algorithm} & \\textbf{Precision} & \\textbf{Recall} & \\textbf{Repeatability} & \\textbf{Speed (s)} & \\textbf{F Score} & \\textbf{APR} & \\textbf{Localization Error} & \\textbf{Corner Quantity} \\\\",
+        "\\textbf{Algorithm} & \\textbf{Precision} & \\textbf{Recall} & \\textbf{Repeatability} & \\textbf{Speed (s)} & \\textbf{F Score} & \\textbf{APR} & \\textbf{Localization Error} & \\textbf{Corner Quantity Ratio} \\\\",
         "\\midrule"
     ]
     
@@ -1797,13 +1825,13 @@ def generate_comparison_tables(results, output_path):
 def visualize_results(ALGORITHMS, output_path):
     plt.figure(figsize=(9, 9))
     
-    for idx, metric in enumerate(['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity', 'corner_quantity_ratio']):
+    for idx, metric in enumerate(['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity_ratio']):
         plt.subplot(3, 3, idx + 1)
         for alg_name in ALGORITHMS:
             data = np.load(os.path.join(output_path, f'data/{alg_name}_results.npz'))[metric]
             plt.plot(data, label=alg_name)
         plt.title(metric.capitalize())
-        plt.legend(loc="upper right")
+        plt.legend(loc="upper right", fontsize="xx-small")
         plt.xlabel('Image Number')
     
     plt.tight_layout()
@@ -1815,7 +1843,7 @@ def plot_best_combination(individual_results, image_names, output_path):
     plot_output_path = os.path.join(output_path, "best_combination_plots")
     os.makedirs(plot_output_path, exist_ok=True)
     
-    metrics = ['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity', 'corner_quantity_ratio']
+    metrics = ['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity_ratio']
     
     for alg_name in individual_results:
         plt.figure(figsize=(9, 9))
@@ -1845,7 +1873,7 @@ def plot_all_combinations(all_metrics_per_algorithm, image_names, output_path):
     plot_output_path = os.path.join(output_path, "all_combinations_plots")
     os.makedirs(plot_output_path, exist_ok=True)
     
-    metrics = ['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity', 'corner_quantity_ratio']
+    metrics = ['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity_ratio']
     
     for alg_name in all_metrics_per_algorithm:
         all_metrics = all_metrics_per_algorithm[alg_name]
@@ -1888,7 +1916,7 @@ def plot_scale_invariance(scale_results, image_names, output_path):
     plot_output_path = os.path.join(output_path, "scale_invariance_plots")
     os.makedirs(plot_output_path, exist_ok=True)
     
-    metrics = ['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity', 'corner_quantity_ratio']
+    metrics = ['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity_ratio']
     scale_labels = [str(val) for val in SCALES]
     
     for alg_name in scale_results:
@@ -1928,8 +1956,10 @@ def generate_param_report(params, combinations, scores, output_path):
         best_score = scores[i]
         
         param_str = "\\\\".join([f"{key.replace('_', '\\_')}: {value}" for key, value in best_params.items()])
-        param_str2 = f"{alg_name} & \\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{\\parbox{{3.5cm}}{{\\raggedright {param_str}}}}} & \\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{{total_combinations}}}  & \\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{{np.round(best_score, 5)}}} \\\\"
+        param_str2 = f"\\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{{alg_name}}} & \\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{\\parbox{{3.25cm}}{{\\raggedright {param_str}}}}} & \\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{{total_combinations}}}  & \\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{{np.round(best_score, 4)}}} \\\\"
         param_report.append(param_str2)
+        param_report.append("& & \\\\")
+        param_report.append("& & \\\\")
         param_report.append("& & \\\\")
         
         if len(best_params.items()) > 2:
@@ -1943,6 +1973,43 @@ def generate_param_report(params, combinations, scores, output_path):
     ]) 
     with open(os.path.join(output_path, "optimal_parameters.txt"), 'w') as f:
         f.write("\n".join(param_report))
+        
+def generate_scale_invariance_table(scale_results, output_path):
+    table_output_path = os.path.join(output_path, "scale_invariance_table.txt")
+    os.makedirs(output_path, exist_ok=True)
+    
+    # Initialize table content
+    table_content = [
+        r"\begin{table}[t]",
+        r"\centering",
+        r"\small",
+        r"\caption{Mean Scale Invariance Scores for Corner Detection Algorithms}",
+        r"\label{tab:scale_invariance_scores}",
+        r"\begin{tabular}{lc}",
+        r"\toprule",
+        r"Algorithm & Scale Invariance Score \\",
+        r"\midrule",
+    ]
+    
+    # Compute mean scale invariance score for each algorithm
+    for alg_name in sorted(scale_results.keys()):
+        scores = [scale_results[alg_name][img_name]['scale_invariance'] 
+                    for img_name in scale_results[alg_name]]
+        mean_score = np.mean(scores)
+        # Format algorithm name (e.g., convert 'ShiTomasi' to 'Shi-Tomasi')
+        formatted_name = alg_name.replace('ShiTomasi', 'Shi-Tomasi')
+        table_content.append(f"{formatted_name} & {mean_score:.3f} \\\\")
+    
+    # Close table
+    table_content.extend([
+        r"\bottomrule",
+        r"\end{tabular}",
+        r"\end{table}"
+    ])
+    
+    # Write table to file
+    with open(table_output_path, 'w') as f:
+        f.write('\n'.join(table_content))
 \end{lstlisting}
 
 \end{document}

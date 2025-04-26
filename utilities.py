@@ -360,7 +360,6 @@ def generate_param_report(params, combinations, scores, output_path):
         f.write("\n".join(param_report))
         
 def generate_scale_invariance_table(scale_results, output_path):
-    """Generate a LaTeX table of mean scale invariance scores for each algorithm."""
     table_output_path = os.path.join(output_path, "scale_invariance_table.txt")
     os.makedirs(output_path, exist_ok=True)
     
