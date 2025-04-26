@@ -1,85 +1,98 @@
 from corner_methods import *
 import os
+from distributions import UniformDist, NormalDist, CategoricalDist
 
 image_path = os.path.join(os.getcwd(), "data/Urban_Corner_datasets/Images")
 ground_truth_path = os.path.join(os.getcwd(), "data/Urban_Corner_datasets/Ground_Truth")
 output_path = os.path.join(os.getcwd(), "results")
 
-SCALES = [0.5, 1.0, 2.0, 3.0]  # Scales to test
+SCALES = [0.25, 1.0, 4.0]  # Scales to test
+
+N_SAMPLES = 15
+MAX_SAMPLES = 1000
+SEED = 11001
 
 ALGORITHMS = {
-    'Harris': harris,
-    'Shi-Tomasi': shi_tomasi,
-    'FAST': fast,
-    'ORB': orb,
-    'SIFT': sift,
-    'BRISK': brisk,
-    'AGAST': agast,
-    'KAZE': kaze,
-    'AKAZE': akaze
-}
+                'Harris'    :  harris,
+                'Shi-Tomasi': shi_tomasi,
+                'FAST'      : fast,
+                'ORB'       : orb,
+                'SIFT'      : sift,
+                'BRISK'     : brisk,
+                'AGAST'     : agast,
+                'KAZE'      : kaze,
+                'AKAZE'     : akaze
+            }
 
+## Using custom distribution generation code
 PARAM_GRIDS = {
     'Harris': {
-        'blockSize': [2, 3, 5, 7, 9, 11],  # Neighborhood size for corner detection
-        'ksize': [3, 5, 7, 9, 11],         # Sobel kernel size for gradient computation
-        'k': [0.01, 0.02, 0.04, 0.06, 0.08, 0.1, 0.15],  # Harris detector free parameter
-        'borderType': [cv2.BORDER_DEFAULT, cv2.BORDER_CONSTANT, cv2.BORDER_REFLECT]  # Border handling
+        'blockSize': UniformDist(min_val=2, max_val=11, is_int=True),
+        'ksize': CategoricalDist(options=[3, 5, 7, 9, 11]),  # Only odd integers
+        'k': UniformDist(min_val=0.01, max_val=0.15),
+        'borderType': CategoricalDist(options=[
+            cv2.BORDER_DEFAULT, cv2.BORDER_CONSTANT, cv2.BORDER_REFLECT
+        ])
     },
+    # ... (rest of PARAM_GRIDS unchanged)
     'Shi-Tomasi': {
-        'maxCorners': [25, 50, 100, 200, 500, 1000],  # Maximum number of corners to detect
-        'qualityLevel': [0.005, 0.01, 0.05, 0.1, 0.2],  # Minimum quality threshold
-        'minDistance': [3, 5, 10, 15, 20, 25, 30],   # Minimum distance between corners
-        'blockSize': [3, 5, 7, 9]                    # Neighborhood size for eigenvalue computation
+        'maxCorners': UniformDist(min_val=25, max_val=1000, is_int=True),
+        'qualityLevel': UniformDist(min_val=0.005, max_val=0.2),
+        'minDistance': UniformDist(min_val=3, max_val=30, is_int=True),
+        'blockSize': UniformDist(min_val=3, max_val=9, is_int=True)
     },
     'FAST': {
-        'threshold': [5, 10, 20, 25, 50, 75, 100],   # Intensity difference threshold
-        'type': [
+        'threshold': UniformDist(min_val=5, max_val=100, is_int=True),
+        'type': CategoricalDist(options=[
             cv2.FAST_FEATURE_DETECTOR_TYPE_5_8,
             cv2.FAST_FEATURE_DETECTOR_TYPE_7_12,
             cv2.FAST_FEATURE_DETECTOR_TYPE_9_16
-        ],  # FAST detector variants
-        'nonmaxSuppression': [True, False]            # Enable/disable non-maximum suppression
+        ]),
+        'nonmaxSuppression': CategoricalDist(options=[True, False])
     },
     'ORB': {
-        'nfeatures': [100, 500, 1000, 2000, 5000],   # Maximum number of features
-        'scaleFactor': [1.05, 1.1, 1.2, 1.3, 1.5],   # Pyramid scale factor
-        'nlevels': [4, 8, 10, 12, 16],              # Number of pyramid levels
-        'edgeThreshold': [15, 31, 50, 70],           # Border size where features are not detected
-        'patchSize': [15, 31, 50],                   # Size of patch for descriptor
-        'fastThreshold': [10, 20, 30, 50]            # FAST threshold for keypoint detection
+        'nfeatures': UniformDist(min_val=100, max_val=5000, is_int=True),
+        'scaleFactor': UniformDist(min_val=1.05, max_val=1.5),
+        'nlevels': UniformDist(min_val=4, max_val=16, is_int=True),
+        'edgeThreshold': UniformDist(min_val=15, max_val=70, is_int=True),
+        'patchSize': UniformDist(min_val=15, max_val=50, is_int=True),
+        'fastThreshold': UniformDist(min_val=10, max_val=50, is_int=True)
     },
     'SIFT': {
-        'nOctaveLayers': [2, 3, 4, 6],              # Layers per octave
-        'contrastThreshold': [0.02, 0.04, 0.08, 0.16],  # Contrast threshold for filtering
-        'edgeThreshold': [5, 10, 20, 30],           # Edge threshold for filtering
-        'sigma': [1.2, 1.6, 2.0, 2.4]               # Gaussian blur sigma for initial image
+        'nOctaveLayers': UniformDist(min_val=2, max_val=6, is_int=True),
+        'contrastThreshold': UniformDist(min_val=0.02, max_val=0.16),
+        'edgeThreshold': UniformDist(min_val=5, max_val=30, is_int=True),
+        'sigma': NormalDist(mean=1.6, std=0.4, min_val=1.0, max_val=2.4)
     },
     'BRISK': {
-        'thresh': [10, 30, 50, 70, 100],            # AGAST detection threshold
-        'octaves': [2, 3, 4, 6],                    # Number of octaves
-        'patternScale': [0.5, 1.0, 1.5, 2.0]        # Scale applied to the pattern
+        'thresh': UniformDist(min_val=10, max_val=100, is_int=True),
+        'octaves': UniformDist(min_val=2, max_val=6, is_int=True),
+        'patternScale': UniformDist(min_val=0.5, max_val=2.0)
     },
     'AGAST': {
-        'threshold': [5, 10, 20, 30, 50],           # Intensity difference threshold
-        'type': [
+        'threshold': UniformDist(min_val=5, max_val=50, is_int=True),
+        'type': CategoricalDist(options=[
             cv2.AgastFeatureDetector_AGAST_5_8,
             cv2.AgastFeatureDetector_AGAST_7_12d,
             cv2.AgastFeatureDetector_OAST_9_16
-        ],  # AGAST detector variants
-        'nonmaxSuppression': [True, False]           # Enable/disable non-maximum suppression
+        ]),
+        'nonmaxSuppression': CategoricalDist(options=[True, False])
     },
     'KAZE': {
-        'threshold': [0.0005, 0.001, 0.002, 0.004],  # Detector response threshold
-        'nOctaves': [2, 3, 4, 6],                   # Number of octaves
-        'nOctaveLayers': [2, 3, 4, 6],              # Layers per octave
-        'diffusivity': [cv2.KAZE_DIFF_PM_G1, cv2.KAZE_DIFF_PM_G2, cv2.KAZE_DIFF_WEICKERT]  # Diffusion type
+        'threshold': UniformDist(min_val=0.0005, max_val=0.004),
+        'nOctaves': UniformDist(min_val=2, max_val=6, is_int=True),
+        'nOctaveLayers': UniformDist(min_val=2, max_val=6, is_int=True),
+        'diffusivity': CategoricalDist(options=[
+            cv2.KAZE_DIFF_PM_G1, cv2.KAZE_DIFF_PM_G2, cv2.KAZE_DIFF_WEICKERT
+        ])
     },
     'AKAZE': {
-        'threshold': [0.0005, 0.001, 0.002, 0.004],  # Detector response threshold
-        'nOctaves': [3, 4, 5, 6],                   # Number of octaves
-        'nOctaveLayers': [2, 3, 4, 6],              # Layers per octave
-        'diffusivity': [cv2.KAZE_DIFF_PM_G1, cv2.KAZE_DIFF_PM_G2]  # Diffusion type
+        'threshold': UniformDist(min_val=0.0005, max_val=0.004),
+        'nOctaves': UniformDist(min_val=3, max_val=6, is_int=True),
+        'nOctaveLayers': UniformDist(min_val=2, max_val=6, is_int=True),
+        'diffusivity': CategoricalDist(options=[
+            cv2.KAZE_DIFF_PM_G1, cv2.KAZE_DIFF_PM_G2
+        ])
     }
 }
 
@@ -89,8 +102,8 @@ PARAM_REPORT = [
     "\\small",
     "\\caption{Optimal Parameters for Corner Detection Algorithms}",
     "\\label{tab:optimal_parameters}",
-    "\\begin{tabular}{lp{3.5cm}c}",
+    "\\begin{tabular}{lp{3.5cm}cc}",
     "\\toprule",
-    "\\textbf{Algorithm} & \\textbf{Optimal Parameters} & \\textbf{$\\#$ Tests} \\\\",
+    "\\textbf{Algorithm} & \\textbf{Optimal Parameters} & \\textbf{$\\#$ Tests} & \\textbf{Best Score} \\\\",
     "\\midrule"
 ]
