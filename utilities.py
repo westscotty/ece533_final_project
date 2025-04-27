@@ -126,6 +126,24 @@ def generate_sample_detections(images, image_names, ground_truth_corners, optimi
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         plt.savefig(os.path.join(sample_output_path, f"{alg_name}_detected.png"))
         plt.close()
+            
+        plt.figure(figsize=(8,10))
+        plt.suptitle(f"Sample Detection: {alg_name}", fontsize=12)
+        for i, img in tqdm(enumerate(images)):
+            corners = alg_func(img, args=params)
+            plt.subplot(6, 4, i+1)
+            plt.imshow(images[i], cmap="gray")
+            plt.axis("off")
+            plt.title(f"Image {image_names[i]}")
+            size = 15
+            if len(corners) > 500:
+                size = 5
+            for corner in corners:
+                plt.scatter(corner[0], corner[1], c='red', marker='o', s=size, label='Detected')
+                    
+        plt.tight_layout()
+        plt.savefig(os.path.join(sample_output_path, f"{alg_name}_all_images_detected.png"))
+        plt.close()
         
         
 def generate_scale_invariance_samples(scaled_images, detected_corners, gt_corners, alg_name, image_name, output_path):
@@ -210,7 +228,7 @@ def generate_comparison_tables(results, output_path):
 def visualize_results(ALGORITHMS, output_path):
     plt.figure(figsize=(9, 9))
     
-    for idx, metric in enumerate(['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity_ratio']):
+    for idx, metric in enumerate(['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity', 'corner_quantity_ratio']):
         plt.subplot(3, 3, idx + 1)
         for alg_name in ALGORITHMS:
             data = np.load(os.path.join(output_path, f'data/{alg_name}_results.npz'))[metric]
@@ -228,7 +246,7 @@ def plot_best_combination(individual_results, image_names, output_path):
     plot_output_path = os.path.join(output_path, "best_combination_plots")
     os.makedirs(plot_output_path, exist_ok=True)
     
-    metrics = ['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity_ratio']
+    metrics = ['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity', 'corner_quantity_ratio']
     
     for alg_name in individual_results:
         plt.figure(figsize=(9, 9))
@@ -258,7 +276,7 @@ def plot_all_combinations(all_metrics_per_algorithm, image_names, output_path):
     plot_output_path = os.path.join(output_path, "all_combinations_plots")
     os.makedirs(plot_output_path, exist_ok=True)
     
-    metrics = ['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity_ratio']
+    metrics = ['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity', 'corner_quantity_ratio']
     
     for alg_name in all_metrics_per_algorithm:
         all_metrics = all_metrics_per_algorithm[alg_name]
@@ -276,10 +294,10 @@ def plot_all_combinations(all_metrics_per_algorithm, image_names, output_path):
                 metric_data = metrics_dict[metric]
                 if combo_idx == best_idx:
                     # Highlight the best combination with a bold line
-                    plt.plot(image_names, metric_data, marker='o', color='red', linewidth=2, label='Best Combination', markersize=3)
+                    plt.plot(image_names, metric_data, marker='o', color='red', linewidth=3, label='Best Combination', markersize=3)
                 else:
                     # Plot other combinations with transparency
-                    plt.plot(image_names, metric_data, marker='o', alpha=0.3, color='blue', markersize=3, label='Other Combinations' if combo_idx == 0 else "")
+                    plt.plot(image_names, metric_data, marker='o', alpha=0.2, color='blue', markersize=2, label='Other Combinations' if combo_idx == 0 else "")
             
             plt.title(metric.capitalize())
             plt.xlabel('Image Number')
@@ -301,7 +319,7 @@ def plot_scale_invariance(scale_results, image_names, output_path):
     plot_output_path = os.path.join(output_path, "scale_invariance_plots")
     os.makedirs(plot_output_path, exist_ok=True)
     
-    metrics = ['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity_ratio']
+    metrics = ['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity', 'corner_quantity_ratio']
     scale_labels = [str(val) for val in SCALES]
     
     for alg_name in scale_results:

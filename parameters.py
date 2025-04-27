@@ -8,12 +8,12 @@ output_path = os.path.join(os.getcwd(), "results")
 
 SCALES = [0.25, 1.0, 4.0]  # Scales to test
 
-N_SAMPLES = 15
-MAX_SAMPLES = 1000
-SEED = 11001
+N_SAMPLES = 20
+MAX_SAMPLES = 250
+SEED = 11003
 
 ALGORITHMS = {
-                'Harris'    :  harris,
+                'Harris'    : harris,
                 'Shi-Tomasi': shi_tomasi,
                 'FAST'      : fast,
                 'ORB'       : orb,
@@ -47,8 +47,7 @@ PARAM_GRIDS = {
             cv2.FAST_FEATURE_DETECTOR_TYPE_5_8,
             cv2.FAST_FEATURE_DETECTOR_TYPE_7_12,
             cv2.FAST_FEATURE_DETECTOR_TYPE_9_16
-        ]),
-        'nonmaxSuppression': CategoricalDist(options=[True, False])
+        ])
     },
     'ORB': {
         'nfeatures': UniformDist(min_val=100, max_val=5000, is_int=True),
@@ -56,7 +55,7 @@ PARAM_GRIDS = {
         'nlevels': UniformDist(min_val=4, max_val=16, is_int=True),
         'edgeThreshold': UniformDist(min_val=15, max_val=70, is_int=True),
         'patchSize': UniformDist(min_val=15, max_val=50, is_int=True),
-        'fastThreshold': UniformDist(min_val=10, max_val=50, is_int=True)
+        'fastThreshold': UniformDist(min_val=5, max_val=100, is_int=True)
     },
     'SIFT': {
         'nOctaveLayers': UniformDist(min_val=2, max_val=6, is_int=True),
@@ -75,8 +74,7 @@ PARAM_GRIDS = {
             cv2.AgastFeatureDetector_AGAST_5_8,
             cv2.AgastFeatureDetector_AGAST_7_12d,
             cv2.AgastFeatureDetector_OAST_9_16
-        ]),
-        'nonmaxSuppression': CategoricalDist(options=[True, False])
+        ])
     },
     'KAZE': {
         'threshold': UniformDist(min_val=0.0005, max_val=0.004),

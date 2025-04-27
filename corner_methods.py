@@ -18,7 +18,7 @@ def shi_tomasi(image, args=None):
 def fast(image, args=None):
 
     args = args or {'threshold': 25, 'type': cv2.FAST_FEATURE_DETECTOR_TYPE_7_12}
-    fast = cv2.FastFeatureDetector_create(**args)
+    fast = cv2.FastFeatureDetector_create(nonmaxSuppression=True, **args)
     keypoints = fast.detect(image, None)
     return np.array([kp.pt for kp in keypoints], dtype=np.float32)
 
@@ -52,7 +52,7 @@ def brisk(image, args=None):
 def agast(image, args=None):
 
     args = args or {'threshold': 10, 'type': 1}
-    agast = cv2.AgastFeatureDetector_create(**args)
+    agast = cv2.AgastFeatureDetector_create(nonmaxSuppression=True, **args)
     keypoints = agast.detect(image, None)
     return np.array([kp.pt for kp in keypoints], dtype=np.float32)
 

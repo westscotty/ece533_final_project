@@ -49,9 +49,10 @@ def optimize_across_images(algorithm, alg_name, images, gt_corners_list, param_g
     
     # Limit to a maximum number of combinations
     param_combinations = list(itertools.product(*param_values))
-    if len(param_combinations) > MAX_SAMPLES:
-        param_combinations = random.sample(param_combinations, MAX_SAMPLES)
-        total_combinations = MAX_SAMPLES
+    if MAX_SAMPLES:
+        if len(param_combinations) > MAX_SAMPLES:
+            param_combinations = random.sample(param_combinations, MAX_SAMPLES)
+            total_combinations = MAX_SAMPLES
     
     # Store metrics for each parameter combination
     all_metrics = []
@@ -108,7 +109,7 @@ def optimize_across_images(algorithm, alg_name, images, gt_corners_list, param_g
         
         # Score is the average of the normalized metrics (excluding corner_quantity since it's not part of optimization)
         # weights = np.array([2/12, 3/12, 3/12, 1/12, 2/12, 1/12])
-        vars = np.array([avg_speed, avg_precision, avg_recall, avg_repeatability, avg_le]) #, avg_corner_quant_ratios])
+        vars = np.array([avg_speed, avg_precision, avg_recall, avg_le, avg_corner_quant_ratios]) #avg_repeatability
         # score = np.sum(vars * weights)
         score = np.sum(vars) / len(vars)
         
