@@ -270,7 +270,7 @@ if __name__ == "__main__":
 
     # Generate sample detection images with optimized parameters
     print("Creating Sample Imagery for Optimized Algorithms ...")
-    utils.generate_sample_detections(images, image_names, ground_truth_corners, optimized_params, ALGORITHMS, output_path)
+    utils.generate_sample_detections(images, image_names, ground_truth_corners, optimized_params, output_path)
     
     # Save results
     print("Writing Results Files ...")
@@ -287,7 +287,7 @@ if __name__ == "__main__":
     
     # Generate individual result plots and pairwise metric plots
     print("Plotting Result Images ...")
-    utils.visualize_results(ALGORITHMS, output_path)
+    utils.visualize_results(output_path, image_names)
     # utils.plot_pairwise_metrics(results, output_path)
     utils.plot_best_combination(individual_results, image_names, output_path)
     utils.plot_all_combinations(all_metrics_per_algorithm, image_names, output_path)
@@ -296,3 +296,5 @@ if __name__ == "__main__":
     scale_results = test_scale_invariance(images, image_names, ground_truth_corners, optimized_params)
     utils.plot_scale_invariance(scale_results, image_names, output_path)
     utils.generate_scale_invariance_table(scale_results, output_path)
+    
+    utils.plot_all_detections(images, image_names, optimized_params, output_path)

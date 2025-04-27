@@ -41,7 +41,7 @@
 
 \begin{document}
 
-\title{Final Project:\\Benchmarking Corner Detection Algorithms}
+\title{Benchmarking Corner\\Detection Algorithms}
 
 \author{
 \IEEEauthorblockN{Weston Scott\\}
@@ -167,18 +167,18 @@ where \( p_i \) and \( q_i \) are pixel pairs in a sampling pattern, and \( \tex
 
 The evaluation of the corner detection algorithms was conducted using the Urban Corner Datasets, sourced from a publicly available repository on GitHub \cite{Urban_Corner_Dataset}. This dataset consists of urban scene images paired with ground truth corner annotations, making it suitable for benchmarking corner detection performance. The images capture various real-world environments, including buildings and street scenes, which present challenges such as varying lighting conditions and geometric distortions. The ground truth annotations provide precise corner locations, enabling accurate computation of metrics like precision, recall, and repeatability. The dataset’s diversity and well-defined annotations make it an ideal choice for assessing the robustness and accuracy of the algorithms under basic, yet realistic conditions. Reference \cref{fig:ground_truth}.\\
 
-\onecolumn
+% \onecolumn
 \begin{figure}[h]
     \centering
     \fbox{
-        \begin{minipage}{0.75\textwidth}
+        \begin{minipage}{0.47\textwidth}
     \includegraphics[width=\linewidth]{../results/ground_truth.png}
     \caption{Urban dataset with ground truth corners applied.}
     \label{fig:ground_truth}
     \end{minipage}
     }
 \end{figure}
-\twocolumn
+% \twocolumn
 
 \section{Implementation}
 \label{section:implementation}
@@ -195,20 +195,48 @@ Parameter optimization is a core component of the benchmarking framework, aiming
 
 The optimization process starts by sampling parameter values using the \texttt{sample\_param\_grid} function, which generates \texttt{N\_SAMPLES} values for each parameter based on its distribution. For example, the Harris algorithm’s \texttt{ksize} is sampled from a \texttt{CategoricalDist} with options [3, 5, 7, 9, 11] to ensure valid odd integers, while \texttt{k} is sampled from a \texttt{UniformDist} over [0.01, 0.15]. The total number of combinations is computed as the product of the number of unique sampled values for each parameter. The implementation limits the number of evaluated combinations to \texttt{MAX\_SAMPLES} (set to 250) by randomly sampling from the Cartesian product of parameter values using Python's \texttt{random.sample}, see full implementation in Appendix A for \texttt{distributions.py}.\\
 
+\begin{lstlisting}[style=python, caption={Distributions Example}, label={lst:uniform_dist}]
+class UniformDist:
+def __init__(self, min_val, max_val, is_int=False):
+    self.min_val = min_val
+    self.max_val = max_val
+    self.is_int = is_int
+
+def sample(self, n_samples):
+    samples = np.round(np.random.uniform(self.min_val, self.max_val, n_samples), 4)
+    if self.is_int:
+        samples = np.round(samples).astype(int)
+        samples = np.clip(samples, self.min_val, self.max_val)
+        
+    return np.unique(samples)[:n_samples]  # Ensure unique samples
+
+    def sample_param_grid(param_grid, n_samples):
+
+sampled_grid = {}
+for param_name, dist in param_grid.items():
+    sampled_grid[param_name] = dist.sample(n_samples)
+return list(sampled_grid.keys()), list(sampled_grid.values())
+
+PARAM_GRIDS = {
+    'Harris': {
+        'blockSize': UniformDist(min_val=2, max_val=11, is_int=True),
+        'ksize': CategoricalDist(options=[3, 5, 7, 9, 11]),  # Only odd integers
+        'k': UniformDist(min_val=0.01, max_val=0.15),
+        'borderType': CategoricalDist(options=[
+            cv2.BORDER_DEFAULT, cv2.BORDER_CONSTANT, cv2.BORDER_REFLECT
+        ])
+    }
+    ... CONTINUED
+}
+\end{lstlisting}
+
 For each parameter combination, the algorithm is applied to all images, and performance metrics (precision, recall, repeatability, F-score, APR, localization error, corner quantity, and corner quantity ratio) are computed using \texttt{calculate\_metrics} from \texttt{utilities.py}, reference \cref{lst:optimize_across_images}. The \texttt{calculate\_metrics} function computes the metrics by comparing predicted corners to ground truth corners within a threshold distance (default 5 pixels). True positives (TP), false positives (FP), and false negatives (FN) are determined using pairwise distance computations via \texttt{scipy.spatial.distance.cdist}, enabling precise evaluation of detection accuracy. The corner quantity ratio, defined as \( \frac{1}{|\text{pred} - \text{gt}| + 1} \), penalizes deviations from the ground truth corner count, contributing to the robustness assessment.\\
 
-The metrics are aggregated by averaging across images, with speed and localization error normalized to [0, 1] (inverted to favor lower values). A composite score is calculated as a weighted sum of selected metrics (defined by \texttt{vars} and \texttt{weights} (or can be), see reference \cref{{lst:scoring}}), allowing flexible prioritization of performance aspects. The combination yielding the highest score is retained as the optimal parameter set. Progress is tracked using a \texttt{tqdm} progress bar, displaying the total number of combinations evaluated, which enhances user feedback during optimization.\\
-
-\subsection{Corner Detection Algorithms}
-The corner detection algorithms are implemented in \texttt{corner\_methods.py}, wrapping OpenCV’s implementations to standardize input/output formats. Each function accepts a grayscale image and an optional dictionary of parameters, returning corner coordinates as a NumPy array of (x, y) floats. The Harris detector uses \texttt{cv2.cornerHarris} with post-processing to select strong corners via dilation and thresholding. Shi-Tomasi employs \texttt{cv2.goodFeaturesToTrack}, while FAST, ORB, SIFT, BRISK, AGAST, KAZE, and AKAZE use their respective OpenCV feature detectors (\texttt{cv2.FastFeatureDetector}, \texttt{cv2.ORB}, etc.). Default parameters are provided to ensure functionality when no parameters are specified, but the optimization process overrides these with sampled values.\\
-
-\onecolumn
 \begin{lstlisting}[style=python, caption={Metric Calculations}, label={lst:optimize_across_images}]
 def calculate_metrics(pred_corners, gt_corners, threshold=5.0):
     gt = np.array(gt_corners, dtype=np.float32)
     pred = np.array(pred_corners, dtype=np.float32)
 
-    # Reshape if necessary
     if pred.ndim == 1 and pred.shape[0] == 2:
         pred = pred.reshape(1, 2)
     if pred.ndim == 1 or pred.size == 0:
@@ -219,15 +247,13 @@ def calculate_metrics(pred_corners, gt_corners, threshold=5.0):
     if gt.ndim == 1 or gt.size == 0:
         gt = np.empty((0, 2), dtype=np.float32)
 
-    # Overall corner quantity (total number of detected corners)
     corner_quantity = len(pred)
     corner_quantity_ratio = 1 / (np.abs(len(pred) - len(gt_corners)) + 1) ## 1/(|gt - pred| + 1)
-    # Early return if either side has no corners
+
     if len(gt) == 0 or len(pred) == 0:
         return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, corner_quantity, corner_quantity_ratio
 
-    # Compute distances between ground truth and predicted corners
-    dists = cdist(gt, pred)  # shape: (num_gt, num_pred)
+    dists = cdist(gt, pred)  
     matched_gt = np.any(dists <= threshold, axis=1)
     matched_pred = np.any(dists <= threshold, axis=0)
 
@@ -241,32 +267,34 @@ def calculate_metrics(pred_corners, gt_corners, threshold=5.0):
 
     denom = (precision + recall)
     f_score = 2 * (precision * recall) / denom if denom > 0 else 0
-    apr = (precision + recall) / 2  # Arithmetic Mean of Precision and Recall
+    apr = (precision + recall) / 2  # Arithmetic Mean 
 
-    # Compute localization error for matched corners
     localization_error = 0.0
     if TP > 0:
-        # Find the closest predicted corner for each ground truth corner
-        min_dists = np.min(dists, axis=1)  # Minimum distance for each ground truth corner
-        matched_dists = min_dists[matched_gt]  # Distances for matched ground truth corners
+        min_dists = np.min(dists, axis=1) 
+        matched_dists = min_dists[matched_gt] 
         localization_error = np.mean(matched_dists) if len(matched_dists) > 0 else 0.0
 
     return precision, recall, repeatability, f_score, apr, localization_error, corner_quantity, corner_quantity_ratio
 \end{lstlisting}
 
-
-\newpage
 \begin{lstlisting}[style=python, caption={Best Combination Scoring}, label={lst:scoring}]
-avg_speed = np.mean(normalized_speeds)
-avg_precision = np.mean(precisions)
-avg_recall = np.mean(recalls)
-avg_repeatability = np.mean(repeatabilities)
-avg_le = np.mean(normalized_le)
-avg_corner_quant_ratios = np.mean(corner_quantity_ratios)
-
-vars = np.array([avg_speed, avg_precision, avg_recall, avg_repeatability, avg_le, avg_corner_quant_ratios])
-score = np.sum(vars) / len(vars)
+    avg_speed = np.mean(normalized_speeds)
+    avg_precision = np.mean(precisions)
+    avg_recall = np.mean(recalls)
+    avg_repeatability = np.mean(repeatabilities)
+    avg_le = np.mean(normalized_le)
+    avg_corner_quant_ratios = np.mean(corner_quantity_ratios)
+    
+    vars = np.array([avg_speed, avg_precision, avg_recall, avg_le, avg_corner_quant_ratios])
+    score = np.sum(vars) / len(vars)
 \end{lstlisting}
+
+The metrics are aggregated by averaging across images, with speed and localization error normalized to [0, 1] (inverted to favor lower values). A composite score is calculated as a weighted sum of selected metrics (defined by \texttt{vars} and \texttt{weights} (or can be), see reference \cref{{lst:scoring}}), allowing flexible prioritization of performance aspects. The combination yielding the highest score is retained as the optimal parameter set. Progress is tracked using a \texttt{tqdm} progress bar, displaying the total number of combinations evaluated, which enhances user feedback during optimization.\\
+
+\subsection{Corner Detection Algorithms}
+The corner detection algorithms are implemented in \texttt{corner\_methods.py}, wrapping OpenCV’s implementations to standardize input/output formats. Each function accepts a grayscale image and an optional dictionary of parameters, returning corner coordinates as a NumPy array of (x, y) floats. The Harris detector uses \texttt{cv2.cornerHarris} with post-processing to select strong corners via dilation and thresholding. Shi-Tomasi employs \texttt{cv2.goodFeaturesToTrack}, while FAST, ORB, SIFT, BRISK, AGAST, KAZE, and AKAZE use their respective OpenCV feature detectors (\texttt{cv2.FastFeatureDetector}, \texttt{cv2.ORB}, etc.). Default parameters are provided to ensure functionality when no parameters are specified, but the optimization process overrides these with sampled values.\\
+
 
 \begin{lstlisting}[style=python, caption={Corner Detection Wrapper Implementations}, label={lst:corern_methods}]
 def harris(image, args=None):
@@ -289,7 +317,6 @@ def fast(image, args=None):
 
 ... CONTINUED
 \end{lstlisting}
-\twocolumn
 
 The modular design allows easy extension to additional algorithms, with each function handling algorithm-specific parameter requirements. For instance, Harris includes \texttt{borderType} to support different boundary handling options, while ORB includes parameters like \texttt{nfeatures} and \texttt{scaleFactor} to control keypoint detection. A large decision in this project was made to only record locations of corners (or keypoints) detected by the algorithms, thought some will provide more information called desciptors (as an example). \\
 
@@ -303,7 +330,7 @@ The benchmarking results are aggregated and visualized to help with analysis. Th
 
 Several visualization functions were written in \texttt{utilities.py} to generate outputs:
 \begin{itemize}
-    \item \texttt{generate\_sample\_detections}: Produces sample detection images for each algorithm on a random image, showing ground truth (blue circles) and detected corners (red circles).
+    \item \texttt{generate\_sample\_detections}: Produces sample detection images for each algorithm on a random image, showing ground truth (green circles) and detected corners (red circles).
     \item \texttt{generate\_comparison\_tables}: Creates a LaTeX table summarizing mean metrics across algorithms, saved as \texttt{comparison\_table.txt}.
     \item \texttt{generate\_param\_report}: Generates a LaTeX table of optimal parameters, total combinations tested, and best scores, saved as \texttt{optimal\_parameters.txt}.
     \item \texttt{visualize\_results}: Plots metrics across images for all algorithms, saved as \texttt{benchmark\_results.png}.
@@ -314,18 +341,18 @@ Several visualization functions were written in \texttt{utilities.py} to generat
 
 The implementation is extensible via the use of a configuration file \texttt{parameters.py} allowing additional algorithms or metrics to be integrated by modifying \texttt{ALGORITHMS} and \texttt{PARAM\_GRIDS} in \texttt{parameters.py}. The use of random seeding (\texttt{SEED = 11001}) ensures reproducibility, and the modular structure facilitates debugging and maintenance.\\
 
-This implementation was written from entirely scratch and provides a comprehensive framework for benchmarking corner detection algorithms, balancing computational efficiency with evaluation across speed, accuracy, and scale invariance. The generated visualizations and tables shown in the next section enable detailed analysis. \\
+\subsection{Troubleshooting and Challenges}
+This implementation was written from entirely scratch and provides a comprehensive framework for benchmarking corner detection algorithms, balancing computational efficiency with evaluation. The generated visualizations and tables shown in the next section enable detailed analysis would often take hours to run, due to the quantity of corners detected (the plotting scripts may not be well optimized.). One large challenge was also figuring out how to get each method to spit out corners. Additionally, there was difficulty with using metrics to determine the best overall combination of parameter used in each algorithm. Different seed numbers also caused problems, with occasionally throwing errors in the CV2 functions. Setting up a framework to run on a scale greater than what is presented here requires much more polishing, in addition to robust error handling.\\
 
 \section{Results}
 \label{section:results}
-
 
 The benchmarking results for the nine corner detection algorithms (Harris, Shi-Tomasi, FAST, ORB, SIFT, BRISK, AGAST, KAZE, and AKAZE) are presented in three categories: individual image performance, aggregate performance across all images, and scale invariance performance. Evaluations were conducted on the Urban Corner Datasets \cite{Urban_Corner_Dataset}, measuring precision, recall, repeatability, F-score, arithmetic mean of precision and recall (APR), localization error, corner quantity, corner quantity ratio, and execution time (speed). Visualizations and tables, generated by the implemented framework, provide detailed insights into each algorithm’s perfo\\rmance, with optimal parameters derived from the grid search described in Section \ref{section:implementation}.
 
 \subsection{Individual Image Results}
 Individual image results reveal how each algorithm performs on specific images from the Urban Corner Datasets, capturing variability due to factors like lighting, texture, and corner density. The \texttt{plot\_best\_combination} function produced plots showing metric values for the optimal parameter set across all images for each algorithm. Figures \ref{fig:harris_combinations} through \ref{fig:fast_combinations} illustrate the performance of the three different algorithms, displaying metrics such as precision, recall, and speed across each benchmark images.\\
 
-Qualitative insights are provided by sample detection images generated by \texttt{generate\_sample\_detections}. Reference \cref{fig:sample_detection_harris} through \cref{fig:sample_detection_fast}, which show detected corners (red circles) and ground truth corners (blue circles) for a randomly selected image using optimized parameters (\cref{tab:optimal_parameters}), highlighting ability to closely match ground truth corners. These results emphasize the need for parameter optimization, as suboptimal settings significantly degraded performance. It is clear that performance is noisy.\\
+Qualitative insights are provided by sample detection images generated by \texttt{generate\_sample\_detections}. Reference \cref{fig:sample_detection_harris} through \cref{fig:sample_detection_fast}, which show detected corners (red circles) and ground truth corners (green circles) for a randomly selected image using optimized parameters (\cref{tab:optimal_parameters}), highlighting ability to closely match ground truth corners. These results emphasize the need for parameter optimization, as suboptimal settings significantly degraded performance. It is clear that performance is noisy.\\
 
 A full series of test images for each algorithm are shown in Appendix \ref{app:optimization_results}.
 
@@ -334,7 +361,7 @@ A full series of test images for each algorithm are shown in Appendix \ref{app:o
     \fbox{
         \begin{minipage}{0.4\textwidth}
     \includegraphics[width=\linewidth]{../results/sample_detections/Harris_detected.png}
-    \caption{Sample detection for Harris on a randomly selected image, with ground truth corners (blue circles) and detected corners (red circles).}
+    \caption{Sample detection for Harris on a randomly selected image, with ground truth corners (green circles) and detected corners (red circles).}
     \label{fig:sample_detection_harris}
     \end{minipage}
     }
@@ -345,7 +372,7 @@ A full series of test images for each algorithm are shown in Appendix \ref{app:o
     \fbox{
         \begin{minipage}{0.4\textwidth}
     \includegraphics[width=\linewidth]{../results/sample_detections/Shi-Tomasi_detected.png}
-    \caption{Sample detection for Shi-Tomasi on a randomly selected image, with ground truth corners (blue circles) and detected corners (red circles).}
+    \caption{Sample detection for Shi-Tomasi on a randomly selected image, with ground truth corners (green circles) and detected corners (red circles).}
     \label{fig:sample_detection_shi}
     \end{minipage}
     }
@@ -356,7 +383,7 @@ A full series of test images for each algorithm are shown in Appendix \ref{app:o
     \fbox{
         \begin{minipage}{0.4\textwidth}
     \includegraphics[width=\linewidth]{../results/sample_detections/FAST_detected.png}
-    \caption{Sample detection for FAST on a randomly selected image, with ground truth corners (blue circles) and detected corners (red circles).}
+    \caption{Sample detection for FAST on a randomly selected image, with ground truth corners (green circles) and detected corners (red circles).}
     \label{fig:sample_detection_fast}
     \end{minipage}
     }
@@ -406,52 +433,52 @@ A full series of test images for each algorithm are shown in Appendix \ref{app:o
     \toprule
     \textbf{Algorithm} & \textbf{Optimal Parameters} & \textbf{$\#$ Tests} & \textbf{Best Score} \\
     \midrule
-    \multirow{4}{*}{Harris} & \multirow{4}{*}{\parbox{3cm}{\raggedright blockSize: 9\\ksize: 3\\k: 0.0645\\borderType: 4}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.3017} \\
+    \multirow{4}{*}{Harris} & \multirow{4}{*}{\parbox{3.25cm}{\raggedright blockSize: 9\\ksize: 3\\k: 0.0118\\borderType: 0}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.3053} \\
     & & \\
     & & \\
     & & \\
     & & \\
     & & \\
-    \multirow{4}{*}{Shi-Tomasi} & \multirow{4}{*}{\parbox{3cm}{\raggedright maxCorners: 901\\qualityLevel: 0.0907\\minDistance: 6\\blockSize: 6}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.2708} \\
+    \multirow{4}{*}{Shi-Tomasi} & \multirow{4}{*}{\parbox{3.25cm}{\raggedright maxCorners: 693\\qualityLevel: 0.0838\\minDistance: 5\\blockSize: 5}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.2743} \\
     & & \\
     & & \\
     & & \\
     & & \\
     & & \\
-    \multirow{2}{*}{FAST} & \multirow{2}{*}{\parbox{3cm}{\raggedright threshold: 48\\type: 2}} & \multirow{2}{*}{250}  & \multirow{2}{*}{0.3412} \\
+    \multirow{2}{*}{FAST} & \multirow{2}{*}{\parbox{3.25cm}{\raggedright threshold: 48\\type: 2}} & \multirow{2}{*}{250}  & \multirow{2}{*}{0.3404} \\
     & & \\
     & & \\
     & & \\
-    \multirow{6}{*}{ORB} & \multirow{6}{*}{\parbox{3cm}{\raggedright nfeatures: 4831\\scaleFactor: 1.0793\\nlevels: 6\\edgeThreshold: 30\\patchSize: 25\\fastThreshold: 7}} & \multirow{6}{*}{250}  & \multirow{6}{*}{0.311} \\
-    & & \\
-    & & \\
-    & & \\
-    & & \\
-    & & \\
-    & & \\
-    & & \\
-    \multirow{4}{*}{SIFT} & \multirow{4}{*}{\parbox{3cm}{\raggedright nOctaveLayers: 4\\contrastThreshold: 0.1493\\edgeThreshold: 17\\sigma: 1.9254}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.327} \\
+    \multirow{6}{*}{ORB} & \multirow{6}{*}{\parbox{3.25cm}{\raggedright nfeatures: 4631\\scaleFactor: 1.3201\\nlevels: 14\\edgeThreshold: 30\\patchSize: 39\\fastThreshold: 37}} & \multirow{6}{*}{250}  & \multirow{6}{*}{0.3122} \\
     & & \\
     & & \\
     & & \\
     & & \\
     & & \\
-    \multirow{3}{*}{BRISK} & \multirow{3}{*}{\parbox{3cm}{\raggedright thresh: 12\\octaves: 3\\patternScale: 0.5133}} & \multirow{3}{*}{250}  & \multirow{3}{*}{0.2815} \\
     & & \\
     & & \\
-    & & \\
-    & & \\
-    \multirow{2}{*}{AGAST} & \multirow{2}{*}{\parbox{3cm}{\raggedright threshold: 33\\type: 0}} & \multirow{2}{*}{250}  & \multirow{2}{*}{0.3588} \\
-    & & \\
-    & & \\
-    & & \\
-    \multirow{4}{*}{KAZE} & \multirow{4}{*}{\parbox{3cm}{\raggedright threshold: 0.0013\\nOctaves: 3\\nOctaveLayers: 3\\diffusivity: 0}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.2847} \\
+    \multirow{4}{*}{SIFT} & \multirow{4}{*}{\parbox{3.25cm}{\raggedright nOctaveLayers: 2\\contrastThreshold: 0.1008\\edgeThreshold: 28\\sigma: 1.6977}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.3049} \\
     & & \\
     & & \\
     & & \\
     & & \\
     & & \\
-    \multirow{4}{*}{AKAZE} & \multirow{4}{*}{\parbox{3cm}{\raggedright threshold: 0.0023\\nOctaves: 3\\nOctaveLayers: 6\\diffusivity: 0}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.3461} \\
+    \multirow{3}{*}{BRISK} & \multirow{3}{*}{\parbox{3.25cm}{\raggedright thresh: 12\\octaves: 4\\patternScale: 0.5133}} & \multirow{3}{*}{250}  & \multirow{3}{*}{0.2965} \\
+    & & \\
+    & & \\
+    & & \\
+    & & \\
+    \multirow{2}{*}{AGAST} & \multirow{2}{*}{\parbox{3.25cm}{\raggedright threshold: 33\\type: 0}} & \multirow{2}{*}{250}  & \multirow{2}{*}{0.3579} \\
+    & & \\
+    & & \\
+    & & \\
+    \multirow{4}{*}{KAZE} & \multirow{4}{*}{\parbox{3.25cm}{\raggedright threshold: 0.0023\\nOctaves: 2\\nOctaveLayers: 2\\diffusivity: 2}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.3364} \\
+    & & \\
+    & & \\
+    & & \\
+    & & \\
+    & & \\
+    \multirow{4}{*}{AKAZE} & \multirow{4}{*}{\parbox{3.25cm}{\raggedright threshold: 0.0019\\nOctaves: 3\\nOctaveLayers: 4\\diffusivity: 0}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.3556} \\
     & & \\
     & & \\
     & & \\
@@ -477,10 +504,43 @@ Aggregate results provide a comprehensive comparison by averaging metrics across
     }
 \end{figure}
 
+\begin{figure}[h]
+    \centering
+    \fbox{
+        \begin{minipage}{0.47\textwidth}
+    \includegraphics[width=\linewidth]{../results/sample_detections/Harris_all_detections.png}
+    \caption{Urban dataset with detected Harris corners applied.}
+    \label{fig:harris_all}
+    \end{minipage}
+    }
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \fbox{
+        \begin{minipage}{0.47\textwidth}
+    \includegraphics[width=\linewidth]{../results/sample_detections/Shi-Tomasi_all_detections.png}
+    \caption{Urban dataset with detected Shi-Tomasi corners applied.}
+    \label{fig:shi_all}
+    \end{minipage}
+    }
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \fbox{
+        \begin{minipage}{0.47\textwidth}
+    \includegraphics[width=\linewidth]{../results/sample_detections/FAST_all_detections.png}
+    \caption{Urban dataset with detected FAST corners applied.}
+    \label{fig:shi_all}
+    \end{minipage}
+    }
+\end{figure}
+
 \subsection{Scale Invariance Results}
 Scale invariance was assessed by applying each algorithm to images scaled at factors [0.25, 1.0, 4.0] using the \texttt{test\_scale\_invariance} function. The scale invariance score, computed as \( 1 - \text{CV} \) (where CV is the coefficient of variation of repeatability across scales), measures detection consistency. Figures \ref{fig:scale_invariance_harris} through \ref{fig:scale_invariance_fast} show the scale invariance plot for a few algorithms, generated by \texttt{plot\_scale\_invariance}, displaying metrics across scales for each image.\\
 
-Figures \ref{fig:scale_invariance_sample_harris} through \ref{fig:scale_invariance_sample_fast} illustrates a sample image at each scale for Harris, Shi-Tomais, and FAST algorithms, generated by \texttt{generate\_scale\_invariance\_samples}, showing ground truth (blue circles) and detected corners (red circles). These images only show a subset of the algorithms and test images. A full series of test images for each algorithm are shown in Appendix \ref{app:scale_invariance_results}. \\
+Figures \ref{fig:scale_invariance_sample_harris} through \ref{fig:scale_invariance_sample_fast} illustrates a sample image at each scale for Harris, Shi-Tomais, and FAST algorithms, generated by \texttt{generate\_scale\_invariance\_samples}, showing ground truth (green circles) and detected corners (red circles). These images only show a subset of the algorithms and test images. A full series of test images for each algorithm are shown in Appendix \ref{app:scale_invariance_results}. \\
 
 \begin{table}[t]
     \centering
@@ -494,14 +554,14 @@ Figures \ref{fig:scale_invariance_sample_harris} through \ref{fig:scale_invarian
     \textbf{Algorithm} & \textbf{Scale Invariance Score} \\
     \midrule
     AGAST & 0.037 \\
-    AKAZE & 0.112 \\
-    BRISK & 0.427 \\
+    AKAZE & 0.105 \\
+    BRISK & 0.443 \\
     FAST & 0.050 \\
-    Harris & 0.206 \\
-    KAZE & 0.197 \\
-    ORB & 0.081 \\
-    SIFT & 0.043 \\
-    Shi-Tomasi & 0.154 \\
+    Harris & 0.166 \\
+    KAZE & 0.059 \\
+    ORB & 0.045 \\
+    SIFT & 0.081 \\
+    Shi-Tomasi & 0.118 \\
     \bottomrule
     \end{tabular}
 \end{minipage}
@@ -513,7 +573,7 @@ Figures \ref{fig:scale_invariance_sample_harris} through \ref{fig:scale_invarian
     \fbox{
         \begin{minipage}{0.45\textwidth}
     \includegraphics[width=\linewidth]{../results/scale_invariance_samples/Harris_scale_invariance_sample.png}
-    \caption{Scale invariance sample for Harris on a randomly selected image, showing ground truth (blue circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
+    \caption{Scale invariance sample for Harris on a randomly selected image, showing ground truth (green circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
     \label{fig:scale_invariance_sample_harris}
     \end{minipage}
     }
@@ -524,7 +584,7 @@ Figures \ref{fig:scale_invariance_sample_harris} through \ref{fig:scale_invarian
     \fbox{
         \begin{minipage}{0.45\textwidth}
     \includegraphics[width=\linewidth]{../results/scale_invariance_samples/Shi-Tomasi_scale_invariance_sample.png}
-    \caption{Scale invariance sample for Shi-Tomasi on a randomly selected image, showing ground truth (blue circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
+    \caption{Scale invariance sample for Shi-Tomasi on a randomly selected image, showing ground truth (green circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
     \label{fig:scale_invariance_sample_shi}
     \end{minipage}
     }
@@ -535,7 +595,7 @@ Figures \ref{fig:scale_invariance_sample_harris} through \ref{fig:scale_invarian
     \fbox{
         \begin{minipage}{0.45\textwidth}
     \includegraphics[width=\linewidth]{../results/scale_invariance_samples/FAST_scale_invariance_sample.png}
-    \caption{Scale invariance sample for FAST on a randomly selected image, showing ground truth (blue circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
+    \caption{Scale invariance sample for FAST on a randomly selected image, showing ground truth (green circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
     \label{fig:scale_invariance_sample_fast}
     \end{minipage}
     }
@@ -587,15 +647,15 @@ Figures \ref{fig:scale_invariance_sample_harris} through \ref{fig:scale_invarian
     \toprule
     \textbf{Algorithm} & \textbf{Precision} & \textbf{Recall} & \textbf{Repeatability} & \textbf{Speed (s)} & \textbf{F Score} & \textbf{APR} & \textbf{Localization Error} & \textbf{Corner Quantity Ratio} \\
     \midrule
-    Harris & 0.002 & 0.270 & 0.270 & 0.0004 & 0.005 & 0.136 & 1.181 & 0.000 \\
-    Shi-Tomasi & 0.078 & 0.115 & 0.115 & 0.0003 & 0.080 & 0.096 & 1.982 & 0.166 \\
+    Harris & 0.002 & 0.318 & 0.318 & 0.0004 & 0.004 & 0.160 & 1.337 & 0.000 \\
+    Shi-Tomasi & 0.073 & 0.102 & 0.102 & 0.0003 & 0.073 & 0.088 & 1.960 & 0.185 \\
     FAST & 0.070 & 0.117 & 0.117 & 0.0001 & 0.075 & 0.093 & 1.961 & 0.144 \\
-    ORB & 0.012 & 0.421 & 0.421 & 0.0018 & 0.023 & 0.217 & 2.164 & 0.001 \\
-    SIFT & 0.037 & 0.029 & 0.029 & 0.0058 & 0.027 & 0.033 & 1.414 & 0.091 \\
-    BRISK & 0.025 & 0.440 & 0.440 & 0.0320 & 0.044 & 0.232 & 2.265 & 0.003 \\
+    ORB & 0.037 & 0.131 & 0.131 & 0.0005 & 0.050 & 0.084 & 1.997 & 0.143 \\
+    SIFT & 0.057 & 0.062 & 0.062 & 0.0059 & 0.054 & 0.059 & 2.115 & 0.087 \\
+    BRISK & 0.025 & 0.439 & 0.439 & 0.0322 & 0.044 & 0.232 & 2.252 & 0.003 \\
     AGAST & 0.069 & 0.101 & 0.101 & 0.0002 & 0.049 & 0.085 & 1.843 & 0.136 \\
-    KAZE & 0.073 & 0.104 & 0.104 & 0.0076 & 0.079 & 0.089 & 2.332 & 0.104 \\
-    AKAZE & 0.069 & 0.043 & 0.043 & 0.0045 & 0.050 & 0.056 & 1.832 & 0.159 \\
+    KAZE & 0.131 & 0.022 & 0.022 & 0.0039 & 0.033 & 0.076 & 1.331 & 0.085 \\
+    AKAZE & 0.076 & 0.053 & 0.053 & 0.0033 & 0.059 & 0.064 & 1.855 & 0.208 \\
     \bottomrule
     \end{tabular}
     \end{minipage}
@@ -671,19 +731,18 @@ Future work could extend the framework by incorporating more advanced detectors 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\onecolumn
-\twocolumn
+% \onecolumn
+% \twocolumn
 
 \appendices
 \section{Optimization Results: Images and Plots}
 \label{app:optimization_results}
-
 \begin{figure}[h]
     \centering
     \fbox{
-        \begin{minipage}{0.4\textwidth}
-    \includegraphics[width=\linewidth]{../results/sample_detections/AGAST_detected.png}
-    \caption{Sample detection for AGAST on a randomly selected image, with ground truth corners (blue circles) and detected corners (red circles).}
+        \begin{minipage}{0.47\textwidth}
+    \includegraphics[width=\linewidth]{../results/sample_detections/AGAST_all_detections.png}
+    \caption{Sample detection for AGAST on a randomly selected image, with ground truth corners (green circles) and detected corners (red circles).}
     \label{fig:agast_samp}
     \end{minipage}
     }
@@ -703,9 +762,9 @@ Future work could extend the framework by incorporating more advanced detectors 
 \begin{figure}[h]
     \centering
     \fbox{
-        \begin{minipage}{0.4\textwidth}
-    \includegraphics[width=\linewidth]{../results/sample_detections/AKAZE_detected.png}
-    \caption{Sample detection for AKAZE on a randomly selected image, with ground truth corners (blue circles) and detected corners (red circles).}
+        \begin{minipage}{0.47\textwidth}
+    \includegraphics[width=\linewidth]{../results/sample_detections/AKAZE_all_detections.png}
+    \caption{Sample detection for AKAZE on a randomly selected image, with ground truth corners (green circles) and detected corners (red circles).}
     \label{fig:akaze_samp}
     \end{minipage}
     }
@@ -725,9 +784,9 @@ Future work could extend the framework by incorporating more advanced detectors 
 \begin{figure}[h]
     \centering
     \fbox{
-        \begin{minipage}{0.4\textwidth}
-    \includegraphics[width=\linewidth]{../results/sample_detections/BRISK_detected.png}
-    \caption{Sample detection for BRISK on a randomly selected image, with ground truth corners (blue circles) and detected corners (red circles).}
+        \begin{minipage}{0.47\textwidth}
+    \includegraphics[width=\linewidth]{../results/sample_detections/BRISK_all_detections.png}
+    \caption{Sample detection for BRISK on a randomly selected image, with ground truth corners (green circles) and detected corners (red circles).}
     \label{fig:brisk_samp}
     \end{minipage}
     }
@@ -747,9 +806,9 @@ Future work could extend the framework by incorporating more advanced detectors 
 \begin{figure}[h]
     \centering
     \fbox{
-        \begin{minipage}{0.4\textwidth}
-    \includegraphics[width=\linewidth]{../results/sample_detections/FAST_detected.png}
-    \caption{Sample detection for FAST on a randomly selected image, with ground truth corners (blue circles) and detected corners (red circles).}
+        \begin{minipage}{0.47\textwidth}
+    \includegraphics[width=\linewidth]{../results/sample_detections/FAST_all_detections.png}
+    \caption{Sample detection for FAST on a randomly selected image, with ground truth corners (green circles) and detected corners (red circles).}
     \label{fig:fast_samp}
     \end{minipage}
     }
@@ -770,9 +829,9 @@ Future work could extend the framework by incorporating more advanced detectors 
 \begin{figure}[h]
     \centering
     \fbox{
-        \begin{minipage}{0.4\textwidth}
-    \includegraphics[width=\linewidth]{../results/sample_detections/Harris_detected.png}
-    \caption{Sample detection for Harris on a randomly selected image, with ground truth corners (blue circles) and detected corners (red circles).}
+        \begin{minipage}{0.47\textwidth}
+    \includegraphics[width=\linewidth]{../results/sample_detections/Harris_all_detections.png}
+    \caption{Sample detection for Harris on a randomly selected image, with ground truth corners (green circles) and detected corners (red circles).}
     \label{fig:harris_samp}
     \end{minipage}
     }
@@ -792,9 +851,9 @@ Future work could extend the framework by incorporating more advanced detectors 
 \begin{figure}[h]
     \centering
     \fbox{
-        \begin{minipage}{0.4\textwidth}
-    \includegraphics[width=\linewidth]{../results/sample_detections/KAZE_detected.png}
-    \caption{Sample detection for KAZE on a randomly selected image, with ground truth corners (blue circles) and detected corners (red circles).}
+        \begin{minipage}{0.47\textwidth}
+    \includegraphics[width=\linewidth]{../results/sample_detections/KAZE_all_detections.png}
+    \caption{Sample detection for KAZE on a randomly selected image, with ground truth corners (green circles) and detected corners (red circles).}
     \label{fig:kaze_samp}
     \end{minipage}
     }
@@ -815,9 +874,9 @@ Future work could extend the framework by incorporating more advanced detectors 
 \begin{figure}[h]
     \centering
     \fbox{
-        \begin{minipage}{0.4\textwidth}
-    \includegraphics[width=\linewidth]{../results/sample_detections/ORB_detected.png}
-    \caption{Sample detection for ORB on a randomly selected image, with ground truth corners (blue circles) and detected corners (red circles).}
+        \begin{minipage}{0.47\textwidth}
+    \includegraphics[width=\linewidth]{../results/sample_detections/ORB_all_detections.png}
+    \caption{Sample detection for ORB on a randomly selected image, with ground truth corners (green circles) and detected corners (red circles).}
     \label{fig:orb_samp}
     \end{minipage}
     }
@@ -837,9 +896,9 @@ Future work could extend the framework by incorporating more advanced detectors 
 \begin{figure}[h]
     \centering
     \fbox{
-        \begin{minipage}{0.4\textwidth}
-    \includegraphics[width=\linewidth]{../results/sample_detections/Shi-Tomasi_detected.png}
-    \caption{Sample detection for Shi-Tomasi on a randomly selected image, with ground truth corners (blue circles) and detected corners (red circles).}
+        \begin{minipage}{0.47\textwidth}
+    \includegraphics[width=\linewidth]{../results/sample_detections/Shi-Tomasi_all_detections.png}
+    \caption{Sample detection for Shi-Tomasi on a randomly selected image, with ground truth corners (green circles) and detected corners (red circles).}
     \label{fig:shi_samp}
     \end{minipage}
     }
@@ -860,9 +919,9 @@ Future work could extend the framework by incorporating more advanced detectors 
 \begin{figure}[h]
     \centering
     \fbox{
-        \begin{minipage}{0.4\textwidth}
-    \includegraphics[width=\linewidth]{../results/sample_detections/SIFT_detected.png}
-    \caption{Sample detection for SIFT on a randomly selected image, with ground truth corners (blue circles) and detected corners (red circles).}
+        \begin{minipage}{0.47\textwidth}
+    \includegraphics[width=\linewidth]{../results/sample_detections/SIFT_all_detections.png}
+    \caption{Sample detection for SIFT on a randomly selected image, with ground truth corners (green circles) and detected corners (red circles).}
     \label{fig:sift_samp}
     \end{minipage}
     }
@@ -885,19 +944,17 @@ Future work could extend the framework by incorporating more advanced detectors 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\onecolumn
-\twocolumn
 \section{Scale Invariance Results: Images and Plots}
 
-\label{app:optimization_results}
+\label{app:scale_invariance_results}
 
 
 \begin{figure}[h]
     \centering
     \fbox{
-        \begin{minipage}{0.45\textwidth}
+        \begin{minipage}{0.47\textwidth}
     \includegraphics[width=\linewidth]{../results/scale_invariance_samples/AGAST_scale_invariance_sample.png}
-    \caption{Scale invariance sample for AGAST on a randomly selected image, showing ground truth (blue circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
+    \caption{Scale invariance sample for AGAST on a randomly selected image, showing ground truth (green circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
     \end{minipage}
     }
 \end{figure}
@@ -915,9 +972,9 @@ Future work could extend the framework by incorporating more advanced detectors 
 \begin{figure}[h]
     \centering
     \fbox{
-        \begin{minipage}{0.45\textwidth}
+        \begin{minipage}{0.47\textwidth}
     \includegraphics[width=\linewidth]{../results/scale_invariance_samples/AKAZE_scale_invariance_sample.png}
-    \caption{Scale invariance sample for AKAZE on a randomly selected image, showing ground truth (blue circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
+    \caption{Scale invariance sample for AKAZE on a randomly selected image, showing ground truth (green circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
     \end{minipage}
     }
 \end{figure}
@@ -935,9 +992,9 @@ Future work could extend the framework by incorporating more advanced detectors 
 \begin{figure}[h]
     \centering
     \fbox{
-        \begin{minipage}{0.45\textwidth}
+        \begin{minipage}{0.47\textwidth}
     \includegraphics[width=\linewidth]{../results/scale_invariance_samples/BRISK_scale_invariance_sample.png}
-    \caption{Scale invariance sample for BRISK on a randomly selected image, showing ground truth (blue circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
+    \caption{Scale invariance sample for BRISK on a randomly selected image, showing ground truth (green circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
     \end{minipage}
     }
 \end{figure}
@@ -957,7 +1014,7 @@ Future work could extend the framework by incorporating more advanced detectors 
 \fbox{
     \begin{minipage}{0.45\textwidth}
 \includegraphics[width=\linewidth]{../results/scale_invariance_samples/FAST_scale_invariance_sample.png}
-\caption{Scale invariance sample for FAST on a randomly selected image, showing ground truth (blue circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
+\caption{Scale invariance sample for FAST on a randomly selected image, showing ground truth (green circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
 \end{minipage}
 }
 \end{figure}
@@ -975,9 +1032,9 @@ Future work could extend the framework by incorporating more advanced detectors 
 \begin{figure}[h]
 \centering
 \fbox{
-    \begin{minipage}{0.45\textwidth}
+    \begin{minipage}{0.47\textwidth}
 \includegraphics[width=\linewidth]{../results/scale_invariance_samples/Harris_scale_invariance_sample.png}
-\caption{Scale invariance sample for Harris on a randomly selected image, showing ground truth (blue circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
+\caption{Scale invariance sample for Harris on a randomly selected image, showing ground truth (green circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
 \end{minipage}
 }
 \end{figure}
@@ -995,9 +1052,9 @@ Future work could extend the framework by incorporating more advanced detectors 
 \begin{figure}[h]
 \centering
 \fbox{
-    \begin{minipage}{0.45\textwidth}
+    \begin{minipage}{0.47\textwidth}
 \includegraphics[width=\linewidth]{../results/scale_invariance_samples/KAZE_scale_invariance_sample.png}
-\caption{Scale invariance sample for KAZE on a randomly selected image, showing ground truth (blue circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
+\caption{Scale invariance sample for KAZE on a randomly selected image, showing ground truth (green circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
 \end{minipage}
 }
 \end{figure}
@@ -1015,9 +1072,9 @@ Future work could extend the framework by incorporating more advanced detectors 
 \begin{figure}[h]
 \centering
 \fbox{
-    \begin{minipage}{0.45\textwidth}
+    \begin{minipage}{0.47\textwidth}
 \includegraphics[width=\linewidth]{../results/scale_invariance_samples/ORB_scale_invariance_sample.png}
-\caption{Scale invariance sample for ORB on a randomly selected image, showing ground truth (blue circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
+\caption{Scale invariance sample for ORB on a randomly selected image, showing ground truth (green circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
 \end{minipage}
 }
 \end{figure}
@@ -1035,9 +1092,9 @@ Future work could extend the framework by incorporating more advanced detectors 
 \begin{figure}[h]
 \centering
 \fbox{
-    \begin{minipage}{0.45\textwidth}
+    \begin{minipage}{0.47\textwidth}
 \includegraphics[width=\linewidth]{../results/scale_invariance_samples/Shi-Tomasi_scale_invariance_sample.png}
-\caption{Scale invariance sample for Shi-Tomasi on a randomly selected image, showing ground truth (blue circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
+\caption{Scale invariance sample for Shi-Tomasi on a randomly selected image, showing ground truth (green circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
 \end{minipage}
 }
 \end{figure}
@@ -1055,9 +1112,9 @@ Future work could extend the framework by incorporating more advanced detectors 
 \begin{figure}[h]
 \centering
 \fbox{
-    \begin{minipage}{0.45\textwidth}
+    \begin{minipage}{0.47\textwidth}
 \includegraphics[width=\linewidth]{../results/scale_invariance_samples/SIFT_scale_invariance_sample.png}
-\caption{Scale invariance sample for Sift on a randomly selected image, showing ground truth (blue circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
+\caption{Scale invariance sample for Sift on a randomly selected image, showing ground truth (green circles) and detected corners (red circles) at scales [0.25, 1.0, 4.0].}
 \end{minipage}
 }
 \end{figure}
@@ -1133,9 +1190,10 @@ def optimize_across_images(algorithm, alg_name, images, gt_corners_list, param_g
     
     # Limit to a maximum number of combinations
     param_combinations = list(itertools.product(*param_values))
-    if len(param_combinations) > MAX_SAMPLES:
-        param_combinations = random.sample(param_combinations, MAX_SAMPLES)
-        total_combinations = MAX_SAMPLES
+    if MAX_SAMPLES:
+        if len(param_combinations) > MAX_SAMPLES:
+            param_combinations = random.sample(param_combinations, MAX_SAMPLES)
+            total_combinations = MAX_SAMPLES
     
     # Store metrics for each parameter combination
     all_metrics = []
@@ -1192,7 +1250,7 @@ def optimize_across_images(algorithm, alg_name, images, gt_corners_list, param_g
         
         # Score is the average of the normalized metrics (excluding corner_quantity since it's not part of optimization)
         # weights = np.array([2/12, 3/12, 3/12, 1/12, 2/12, 1/12])
-        vars = np.array([avg_speed, avg_precision, avg_recall, avg_repeatability, avg_le]) #, avg_corner_quant_ratios])
+        vars = np.array([avg_speed, avg_precision, avg_recall, avg_le, avg_corner_quant_ratios]) #avg_repeatability
         # score = np.sum(vars * weights)
         score = np.sum(vars) / len(vars)
         
@@ -1353,7 +1411,7 @@ if __name__ == "__main__":
 
     # Generate sample detection images with optimized parameters
     print("Creating Sample Imagery for Optimized Algorithms ...")
-    utils.generate_sample_detections(images, image_names, ground_truth_corners, optimized_params, ALGORITHMS, output_path)
+    utils.generate_sample_detections(images, image_names, ground_truth_corners, optimized_params, output_path)
     
     # Save results
     print("Writing Results Files ...")
@@ -1370,7 +1428,7 @@ if __name__ == "__main__":
     
     # Generate individual result plots and pairwise metric plots
     print("Plotting Result Images ...")
-    utils.visualize_results(ALGORITHMS, output_path)
+    utils.visualize_results(output_path, image_names)
     # utils.plot_pairwise_metrics(results, output_path)
     utils.plot_best_combination(individual_results, image_names, output_path)
     utils.plot_all_combinations(all_metrics_per_algorithm, image_names, output_path)
@@ -1379,6 +1437,8 @@ if __name__ == "__main__":
     scale_results = test_scale_invariance(images, image_names, ground_truth_corners, optimized_params)
     utils.plot_scale_invariance(scale_results, image_names, output_path)
     utils.generate_scale_invariance_table(scale_results, output_path)
+    
+    utils.plot_all_detections(images, image_names, optimized_params, output_path)
 \end{lstlisting}
 \bigskip
 \bigskip
@@ -1394,12 +1454,12 @@ output_path = os.path.join(os.getcwd(), "results")
 
 SCALES = [0.25, 1.0, 4.0]  # Scales to test
 
-N_SAMPLES = 15
-MAX_SAMPLES = 1000
-SEED = 11001
+N_SAMPLES = 20
+MAX_SAMPLES = 250
+SEED = 11003
 
 ALGORITHMS = {
-                'Harris'    :  harris,
+                'Harris'    : harris,
                 'Shi-Tomasi': shi_tomasi,
                 'FAST'      : fast,
                 'ORB'       : orb,
@@ -1433,8 +1493,7 @@ PARAM_GRIDS = {
             cv2.FAST_FEATURE_DETECTOR_TYPE_5_8,
             cv2.FAST_FEATURE_DETECTOR_TYPE_7_12,
             cv2.FAST_FEATURE_DETECTOR_TYPE_9_16
-        ]),
-        'nonmaxSuppression': CategoricalDist(options=[True, False])
+        ])
     },
     'ORB': {
         'nfeatures': UniformDist(min_val=100, max_val=5000, is_int=True),
@@ -1442,7 +1501,7 @@ PARAM_GRIDS = {
         'nlevels': UniformDist(min_val=4, max_val=16, is_int=True),
         'edgeThreshold': UniformDist(min_val=15, max_val=70, is_int=True),
         'patchSize': UniformDist(min_val=15, max_val=50, is_int=True),
-        'fastThreshold': UniformDist(min_val=10, max_val=50, is_int=True)
+        'fastThreshold': UniformDist(min_val=5, max_val=100, is_int=True)
     },
     'SIFT': {
         'nOctaveLayers': UniformDist(min_val=2, max_val=6, is_int=True),
@@ -1461,8 +1520,7 @@ PARAM_GRIDS = {
             cv2.AgastFeatureDetector_AGAST_5_8,
             cv2.AgastFeatureDetector_AGAST_7_12d,
             cv2.AgastFeatureDetector_OAST_9_16
-        ]),
-        'nonmaxSuppression': CategoricalDist(options=[True, False])
+        ])
     },
     'KAZE': {
         'threshold': UniformDist(min_val=0.0005, max_val=0.004),
@@ -1573,7 +1631,7 @@ def shi_tomasi(image, args=None):
 def fast(image, args=None):
 
     args = args or {'threshold': 25, 'type': cv2.FAST_FEATURE_DETECTOR_TYPE_7_12}
-    fast = cv2.FastFeatureDetector_create(**args)
+    fast = cv2.FastFeatureDetector_create(nonmaxSuppression=True, **args)
     keypoints = fast.detect(image, None)
     return np.array([kp.pt for kp in keypoints], dtype=np.float32)
 
@@ -1607,7 +1665,7 @@ def brisk(image, args=None):
 def agast(image, args=None):
 
     args = args or {'threshold': 10, 'type': 1}
-    agast = cv2.AgastFeatureDetector_create(**args)
+    agast = cv2.AgastFeatureDetector_create(nonmaxSuppression=True, **args)
     keypoints = agast.detect(image, None)
     return np.array([kp.pt for kp in keypoints], dtype=np.float32)
 
@@ -1647,9 +1705,9 @@ def plot_ground_truth(images, image_names, ground_truth_corners, output_path):
         plt.subplot(6, 4, i+1)
         plt.imshow(images[i], cmap="gray")
         plt.axis("off")
-        plt.title(f"Image {image_names[i]}")
+        plt.title(f"Image {image_names[i]} (x{len(ground_truth_corners[i])})")
         for corner in ground_truth_corners[i]:
-            plt.scatter(corner[1], corner[0], color="blue", marker='o', s=10)
+            plt.scatter(corner[1], corner[0], color="green", marker='o', s=10)
             
     plt.tight_layout()
     plt.savefig(os.path.join(output_path, "ground_truth.png"))
@@ -1714,7 +1772,7 @@ def calculate_metrics(pred_corners, gt_corners, threshold=5.0):
     return precision, recall, repeatability, f_score, apr, localization_error, corner_quantity, corner_quantity_ratio
 
         
-def generate_sample_detections(images, image_names, ground_truth_corners, optimized_params, algorithms, output_path):
+def generate_sample_detections(images, image_names, ground_truth_corners, optimized_params, output_path):
 
     sample_output_path = os.path.join(output_path, "sample_detections")
     os.makedirs(sample_output_path, exist_ok=True)
@@ -1723,7 +1781,7 @@ def generate_sample_detections(images, image_names, ground_truth_corners, optimi
     image = images[idx]
     name = image_names[idx]
     
-    for alg_name, alg_func in algorithms.items():
+    for alg_name, alg_func in ALGORITHMS.items():
         params = optimized_params[alg_name]
         corners = alg_func(image, args=params)
         gt_corners = ground_truth_corners[idx]
@@ -1739,7 +1797,7 @@ def generate_sample_detections(images, image_names, ground_truth_corners, optimi
         
         # Plot ground truth corners
         for corner in gt_corners:
-            plt.scatter(corner[1], corner[0], c='blue', marker='o', s=15, label='Ground Truth')
+            plt.scatter(corner[1], corner[0], c='green', marker='o', s=10, label='Ground Truth')
         
         # Detected corners subplot (right column)
         plt.subplot(2, 1, 2)
@@ -1748,14 +1806,47 @@ def generate_sample_detections(images, image_names, ground_truth_corners, optimi
         plt.axis("off")
         
         # Plot detected corners
-        size = 15
-        if len(corners) > 500:
+        size = 10
+        if len(corners) > 100:
             size = 5
         for corner in corners:
             plt.scatter(corner[0], corner[1], c='red', marker='o', s=size, label='Detected')
         
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         plt.savefig(os.path.join(sample_output_path, f"{alg_name}_detected.png"))
+        plt.close()
+        
+        
+def plot_all_detections(images, image_names, optimized_params, output_path):
+    sample_output_path = os.path.join(output_path, "sample_detections")
+    os.makedirs(sample_output_path, exist_ok=True)
+    
+    for alg_name, alg_func in tqdm(ALGORITHMS.items(), desc="Plotting All Optimized Detections"):
+        params = optimized_params.get(alg_name, {})
+        plt.figure(figsize=(8, 10))
+        plt.suptitle(f"Detected Corners: {alg_name}", fontsize=12)
+        
+        for i in range(len(images)):
+            try:
+                corners = alg_func(images[i], args=params)
+                if corners is None or len(corners) == 0:
+                    corners = np.array([])
+            except Exception as e:
+                print(f"Error processing {alg_name} for image {image_names[i]}: {e}")
+                corners = np.array([])
+            
+            plt.subplot(6, 4, i + 1)
+            plt.imshow(images[i], cmap="gray")
+            plt.axis("off")
+            plt.title(f"Image {image_names[i]} (x{len(corners)})")
+            size = 10
+            if len(corners) > 100:
+                size = 5
+            for corner in corners:
+                plt.scatter(corner[0], corner[1], color="red", marker='o', s=size)
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(sample_output_path, f"{alg_name}_all_detections.png"))
         plt.close()
         
         
@@ -1777,7 +1868,7 @@ def generate_scale_invariance_samples(scaled_images, detected_corners, gt_corner
         # Plot ground truth corners (adjusted for scale)
         scaled_gt = gt_corners * scale
         for corner in scaled_gt:
-            plt.scatter(corner[1], corner[0], c='blue', marker='o', s=15, label='Ground Truth' if i == 0 else "")
+            plt.scatter(corner[1], corner[0], c='green', marker='o', s=10, label='Ground Truth' if i == 0 else "")
         
         # Detected corners subplot (right column, i.e., subplot 2, 4, 6)
         plt.subplot(3, 2, 2 * i + 2)
@@ -1785,12 +1876,12 @@ def generate_scale_invariance_samples(scaled_images, detected_corners, gt_corner
         plt.title(f"Detected (x{len(corners)}) (Scale {scale})", fontsize=10)
         plt.axis("off")
         
-        size = 15
-        if len(corners) > 500:
+        size = 10
+        if len(corners) > 100:
             size = 5
         
         if scale < 1:
-            size = 5
+            size = int(size * scale)
         # Plot detected corners
         for corner in corners:
             plt.scatter(corner[0], corner[1], c='red', marker='o', s=size, label='Detected' if i == 0 else "")
@@ -1838,10 +1929,11 @@ def generate_comparison_tables(results, output_path):
     with open(table_path, 'w') as f:
         f.write("\n".join(table_content))
 
-def visualize_results(ALGORITHMS, output_path):
+def visualize_results(output_path, image_names):
     plt.figure(figsize=(9, 9))
     
-    for idx, metric in enumerate(['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity_ratio']):
+    x_ticks = []
+    for idx, metric in enumerate(['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity', 'corner_quantity_ratio']):
         plt.subplot(3, 3, idx + 1)
         for alg_name in ALGORITHMS:
             data = np.load(os.path.join(output_path, f'data/{alg_name}_results.npz'))[metric]
@@ -1859,7 +1951,7 @@ def plot_best_combination(individual_results, image_names, output_path):
     plot_output_path = os.path.join(output_path, "best_combination_plots")
     os.makedirs(plot_output_path, exist_ok=True)
     
-    metrics = ['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity_ratio']
+    metrics = ['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity', 'corner_quantity_ratio']
     
     for alg_name in individual_results:
         plt.figure(figsize=(9, 9))
@@ -1869,11 +1961,11 @@ def plot_best_combination(individual_results, image_names, output_path):
             plt.subplot(3, 3, idx + 1)
             # Gather metric data across all images
             metric_data = [individual_results[alg_name][img_name][metric][0] for img_name in image_names]
-            plt.plot(image_names, metric_data, marker='o', label=alg_name)
+            plt.plot(image_names, metric_data, marker='o', color='red', label=alg_name)
             plt.title(metric.capitalize())
             plt.xlabel('Image Number')
             plt.ylabel(metric.capitalize())
-            plt.xticks(rotation=45)
+
             if metric not in ['speed', 'localization_error', 'corner_quantity']:
                 plt.ylim(0, 1)
             else:
@@ -1889,7 +1981,7 @@ def plot_all_combinations(all_metrics_per_algorithm, image_names, output_path):
     plot_output_path = os.path.join(output_path, "all_combinations_plots")
     os.makedirs(plot_output_path, exist_ok=True)
     
-    metrics = ['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity_ratio']
+    metrics = ['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity', 'corner_quantity_ratio']
     
     for alg_name in all_metrics_per_algorithm:
         all_metrics = all_metrics_per_algorithm[alg_name]
@@ -1907,15 +1999,15 @@ def plot_all_combinations(all_metrics_per_algorithm, image_names, output_path):
                 metric_data = metrics_dict[metric]
                 if combo_idx == best_idx:
                     # Highlight the best combination with a bold line
-                    plt.plot(image_names, metric_data, marker='o', color='red', linewidth=2, label='Best Combination', markersize=3)
+                    plt.plot(image_names, metric_data, color='red', linewidth=3, label='Best Combination', markersize=3)
                 else:
                     # Plot other combinations with transparency
-                    plt.plot(image_names, metric_data, marker='o', alpha=0.3, color='blue', markersize=3, label='Other Combinations' if combo_idx == 0 else "")
+                    plt.plot(image_names, metric_data, alpha=0.15, color='green', markersize=1, linewidth=0.75, label='Other Combinations' if combo_idx == 0 else "")
             
             plt.title(metric.capitalize())
-            plt.xlabel('Image Number')
+            plt.xlabel('Image Number') 
             plt.ylabel(metric.capitalize())
-            # plt.xticks(rotation=45)
+
             if metric not in ['speed', 'localization_error', 'corner_quantity']:
                 plt.ylim(0, 1)
             else:
@@ -1932,7 +2024,7 @@ def plot_scale_invariance(scale_results, image_names, output_path):
     plot_output_path = os.path.join(output_path, "scale_invariance_plots")
     os.makedirs(plot_output_path, exist_ok=True)
     
-    metrics = ['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity_ratio']
+    metrics = ['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity', 'corner_quantity_ratio']
     scale_labels = [str(val) for val in SCALES]
     
     for alg_name in scale_results:
@@ -1972,7 +2064,7 @@ def generate_param_report(params, combinations, scores, output_path):
         best_score = scores[i]
         
         param_str = "\\\\".join([f"{key.replace('_', '\\_')}: {value}" for key, value in best_params.items()])
-        param_str2 = f"\\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{{alg_name}}} & \\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{\\parbox{{3cm}}{{\\raggedright {param_str}}}}} & \\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{{total_combinations}}}  & \\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{{np.round(best_score, 4)}}} \\\\"
+        param_str2 = f"\\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{{alg_name}}} & \\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{\\parbox{{3.25cm}}{{\\raggedright {param_str}}}}} & \\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{{total_combinations}}}  & \\multirow{{" + f"{len(best_params.items())}" + f"}}{{*}}{{{np.round(best_score, 4)}}} \\\\"
         param_report.append(param_str2)
         param_report.append("& & \\\\")
         param_report.append("& & \\\\")

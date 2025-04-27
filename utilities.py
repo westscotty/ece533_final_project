@@ -16,9 +16,9 @@ def plot_ground_truth(images, image_names, ground_truth_corners, output_path):
         plt.subplot(6, 4, i+1)
         plt.imshow(images[i], cmap="gray")
         plt.axis("off")
-        plt.title(f"Image {image_names[i]}")
+        plt.title(f"Image {image_names[i]} (x{len(ground_truth_corners[i])})")
         for corner in ground_truth_corners[i]:
-            plt.scatter(corner[1], corner[0], color="blue", marker='o', s=10)
+            plt.scatter(corner[1], corner[0], color="green", marker='o', s=10)
             
     plt.tight_layout()
     plt.savefig(os.path.join(output_path, "ground_truth.png"))
@@ -83,7 +83,7 @@ def calculate_metrics(pred_corners, gt_corners, threshold=5.0):
     return precision, recall, repeatability, f_score, apr, localization_error, corner_quantity, corner_quantity_ratio
 
         
-def generate_sample_detections(images, image_names, ground_truth_corners, optimized_params, algorithms, output_path):
+def generate_sample_detections(images, image_names, ground_truth_corners, optimized_params, output_path):
 
     sample_output_path = os.path.join(output_path, "sample_detections")
     os.makedirs(sample_output_path, exist_ok=True)
@@ -92,7 +92,7 @@ def generate_sample_detections(images, image_names, ground_truth_corners, optimi
     image = images[idx]
     name = image_names[idx]
     
-    for alg_name, alg_func in algorithms.items():
+    for alg_name, alg_func in ALGORITHMS.items():
         params = optimized_params[alg_name]
         corners = alg_func(image, args=params)
         gt_corners = ground_truth_corners[idx]
@@ -108,7 +108,7 @@ def generate_sample_detections(images, image_names, ground_truth_corners, optimi
         
         # Plot ground truth corners
         for corner in gt_corners:
-            plt.scatter(corner[1], corner[0], c='blue', marker='o', s=15, label='Ground Truth')
+            plt.scatter(corner[1], corner[0], c='green', marker='o', s=10, label='Ground Truth')
         
         # Detected corners subplot (right column)
         plt.subplot(2, 1, 2)
@@ -117,8 +117,8 @@ def generate_sample_detections(images, image_names, ground_truth_corners, optimi
         plt.axis("off")
         
         # Plot detected corners
-        size = 15
-        if len(corners) > 500:
+        size = 10
+        if len(corners) > 100:
             size = 5
         for corner in corners:
             plt.scatter(corner[0], corner[1], c='red', marker='o', s=size, label='Detected')
@@ -126,23 +126,38 @@ def generate_sample_detections(images, image_names, ground_truth_corners, optimi
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         plt.savefig(os.path.join(sample_output_path, f"{alg_name}_detected.png"))
         plt.close()
+        
+        
+def plot_all_detections(images, image_names, optimized_params, output_path):
+    sample_output_path = os.path.join(output_path, "sample_detections")
+    os.makedirs(sample_output_path, exist_ok=True)
+    
+    for alg_name, alg_func in tqdm(ALGORITHMS.items(), desc="Plotting All Optimized Detections"):
+        params = optimized_params.get(alg_name, {})
+        plt.figure(figsize=(8, 10))
+        plt.suptitle(f"Detected Corners: {alg_name}", fontsize=12)
+        
+        for i in range(len(images)):
+            try:
+                corners = alg_func(images[i], args=params)
+                if corners is None or len(corners) == 0:
+                    corners = np.array([])
+            except Exception as e:
+                print(f"Error processing {alg_name} for image {image_names[i]}: {e}")
+                corners = np.array([])
             
-        plt.figure(figsize=(8,10))
-        plt.suptitle(f"Sample Detection: {alg_name}", fontsize=12)
-        for i, img in tqdm(enumerate(images)):
-            corners = alg_func(img, args=params)
-            plt.subplot(6, 4, i+1)
+            plt.subplot(6, 4, i + 1)
             plt.imshow(images[i], cmap="gray")
             plt.axis("off")
-            plt.title(f"Image {image_names[i]}")
-            size = 15
-            if len(corners) > 500:
+            plt.title(f"Image {image_names[i]} (x{len(corners)})")
+            size = 10
+            if len(corners) > 100:
                 size = 5
             for corner in corners:
-                plt.scatter(corner[0], corner[1], c='red', marker='o', s=size, label='Detected')
-                    
+                plt.scatter(corner[0], corner[1], color="red", marker='o', s=size)
+        
         plt.tight_layout()
-        plt.savefig(os.path.join(sample_output_path, f"{alg_name}_all_images_detected.png"))
+        plt.savefig(os.path.join(sample_output_path, f"{alg_name}_all_detections.png"))
         plt.close()
         
         
@@ -164,7 +179,7 @@ def generate_scale_invariance_samples(scaled_images, detected_corners, gt_corner
         # Plot ground truth corners (adjusted for scale)
         scaled_gt = gt_corners * scale
         for corner in scaled_gt:
-            plt.scatter(corner[1], corner[0], c='blue', marker='o', s=15, label='Ground Truth' if i == 0 else "")
+            plt.scatter(corner[1], corner[0], c='green', marker='o', s=10, label='Ground Truth' if i == 0 else "")
         
         # Detected corners subplot (right column, i.e., subplot 2, 4, 6)
         plt.subplot(3, 2, 2 * i + 2)
@@ -172,12 +187,12 @@ def generate_scale_invariance_samples(scaled_images, detected_corners, gt_corner
         plt.title(f"Detected (x{len(corners)}) (Scale {scale})", fontsize=10)
         plt.axis("off")
         
-        size = 15
-        if len(corners) > 500:
+        size = 10
+        if len(corners) > 100:
             size = 5
         
         if scale < 1:
-            size = 5
+            size = int(size * scale)
         # Plot detected corners
         for corner in corners:
             plt.scatter(corner[0], corner[1], c='red', marker='o', s=size, label='Detected' if i == 0 else "")
@@ -225,9 +240,10 @@ def generate_comparison_tables(results, output_path):
     with open(table_path, 'w') as f:
         f.write("\n".join(table_content))
 
-def visualize_results(ALGORITHMS, output_path):
+def visualize_results(output_path, image_names):
     plt.figure(figsize=(9, 9))
     
+    x_ticks = []
     for idx, metric in enumerate(['speed', 'precision', 'recall', 'repeatability', 'f_score', 'apr', 'localization_error', 'corner_quantity', 'corner_quantity_ratio']):
         plt.subplot(3, 3, idx + 1)
         for alg_name in ALGORITHMS:
@@ -256,11 +272,11 @@ def plot_best_combination(individual_results, image_names, output_path):
             plt.subplot(3, 3, idx + 1)
             # Gather metric data across all images
             metric_data = [individual_results[alg_name][img_name][metric][0] for img_name in image_names]
-            plt.plot(image_names, metric_data, marker='o', label=alg_name)
+            plt.plot(image_names, metric_data, marker='o', color='red', label=alg_name)
             plt.title(metric.capitalize())
             plt.xlabel('Image Number')
             plt.ylabel(metric.capitalize())
-            plt.xticks(rotation=45)
+
             if metric not in ['speed', 'localization_error', 'corner_quantity']:
                 plt.ylim(0, 1)
             else:
@@ -294,15 +310,15 @@ def plot_all_combinations(all_metrics_per_algorithm, image_names, output_path):
                 metric_data = metrics_dict[metric]
                 if combo_idx == best_idx:
                     # Highlight the best combination with a bold line
-                    plt.plot(image_names, metric_data, marker='o', color='red', linewidth=3, label='Best Combination', markersize=3)
+                    plt.plot(image_names, metric_data, color='red', linewidth=3, label='Best Combination', markersize=3)
                 else:
                     # Plot other combinations with transparency
-                    plt.plot(image_names, metric_data, marker='o', alpha=0.2, color='blue', markersize=2, label='Other Combinations' if combo_idx == 0 else "")
+                    plt.plot(image_names, metric_data, alpha=0.15, color='green', markersize=1, linewidth=0.75, label='Other Combinations' if combo_idx == 0 else "")
             
             plt.title(metric.capitalize())
-            plt.xlabel('Image Number')
+            plt.xlabel('Image Number') 
             plt.ylabel(metric.capitalize())
-            # plt.xticks(rotation=45)
+
             if metric not in ['speed', 'localization_error', 'corner_quantity']:
                 plt.ylim(0, 1)
             else:
