@@ -66,11 +66,15 @@
 \pagebreak
 
 \begin{abstract}
-This project focuses on benchmarking corner detection algorithms in the OpenCV Python library, including Harris, Shi-Tomasi, FAST (Features from Accelerated Segment Test), ORB (Oriented FAST and Rotated BRIEF), SIFT (Scale-Invariant Feature Transform), BRISK (Binary Robust Invariant Scalable Keypoints), AGAST (Adaptive and Generic Accelerated Segment Test), KAZE, and AKAZE. The study involves optimizing each algorithm for independent performance, testing their efficiency (speed), accuracy, and robustness to scale invariance through zooming in and out on test images. The MDPI benchmark dataset will be used for evaluation, along with metrics such as execution time, precision, recall, and repeatability.
+This project focuses on benchmarking corner detection algorithms in the OpenCV Python library, including Harris, Shi-Tomasi, FAST (Features from Accelerated Segment Test), ORB (Oriented FAST and Rotated BRIEF), SIFT (Scale-Invariant Feature Transform), BRISK (Binary Robust Invariant Scalable Keypoints), AGAST (Adaptive and Generic Accelerated Segment Test), KAZE, and AKAZE (Accelerated KAZE). The study involves optimizing each algorithm for independent performance, testing their efficiency (speed), accuracy, and robustness to scale invariance through zooming in and out on test images. The MDPI benchmark dataset will be used for evaluation, along with metrics such as execution time, precision, recall, and repeatability.
 \end{abstract}
 
 \section{Introduction}
-Corner detection is a critical component in computer vision, facilitating feature extraction and tracking in tasks such as image registration, object recognition, and 3D reconstruction. OpenCV provides several well-established corner detection algorithms, and this project aims to compare their performance and optimize their parameters, in addition to establishing a framework for doing so.
+% Corner detection is a critical component in computer vision, facilitating feature extraction and tracking in tasks such as image registration, object recognition, and 3D reconstruction. OpenCV provides several established corner detection algorithms, and this project aims to compare their performance and optimize their parameters, in addition to establishing a framework for doing so.
+
+Corner detection is a fundamental task in computer vision, serving as the basis for key applications such as image registration, object recognition, simultaneous localization and mapping (SLAM), and 3D reconstruction. Corners represent points of high two-dimensional intensity variation, making them robust and distinctive features for matching across images. However, reliable corner detection remains challenging due to variability in imaging conditions, including changes in scale, rotation, illumination, noise, and viewpoint. Algorithms must balance competing demands of detection accuracy, computational efficiency, and robustness to these transformations. Over the past decades, several corner detection algorithms have been developed, ranging from early methods like the Harris detector to more recent techniques like AGAST and KAZE. Libraries such as OpenCV have made these algorithms widely accessible, but their relative performance in practical scenarios often depends heavily on hyperparameter choices and specific image conditions.\\
+
+This project presents a systematic benchmarking of nine widely-used OpenCV corner detection algorithms: Harris, Shi-Tomasi, FAST, ORB, SIFT, BRISK, AGAST, KAZE, and AKAZE. Each algorithm is optimized through parameter tuning on a real-world urban dataset with ground truth annotations. Performance is evaluated across multiple metrics, including execution time, precision, recall, repeatability, localization error, and scale invariance. By establishing a reproducible evaluation framework and quantitatively comparing optimized detector performances, this work aims to provide practical insights into the strengths and trade-offs of each method under diverse imaging conditions. The results inform algorithm selection for applications requiring high accuracy, speed, or robustness to scale transformations.\\
 
 \section{Theory and Algorithm Overview}
 \label{section:theory}
@@ -88,7 +92,7 @@ where \( I_x \) and \( I_y \) are the partial derivatives (gradients) of the ima
 R = \det(M) - k \cdot (\text{trace}(M))^2
 \end{equation}
 
-where \( \det(M) = \lambda_1 \lambda_2 = I_x^2 I_y^2 - (I_x I_y)^2 \), \( \text{trace}(M) = \lambda_1 + \lambda_2 = I_x^2 + I_y^2 \), and \( \lambda_1, \lambda_2 \) are the eigenvalues of \( M \). The parameter \( k \), typically set between 0.04 and 0.06, balances the sensitivity to corner-like features. A point is classified as a corner if \( R \) exceeds a user-defined threshold, indicating that both eigenvalues are large, signifying high intensity variation in orthogonal directions. The algorithm is robust to noise when combined with Gaussian smoothing but is sensitive to scale changes and requires careful tuning of \( k \) and the threshold \cite{Harris_Corner}. Non-maximum suppression is often applied to ensure only local maxima in \( R \) are selected as corners.\\
+where \( \det(M) = \lambda_1 \lambda_2 = I_x^2 I_y^2 - (I_x I_y)^2 \), \( \text{trace}(M) = \lambda_1 + \lambda_2 = I_x^2 + I_y^2 \), and \( \lambda_1, \lambda_2 \) are the eigenvalues of \( M \). The parameter \( k \), typically set between 0.04 and 0.06, balances the sensitivity to corner-like features. A point is classified as a corner if \( R \) exceeds a user-defined threshold, indicating that both eigenvalues are large, signifying high intensity variation in orthogonal directions. The algorithm is robust to noise when combined with Gaussian smoothing but is sensitive to scale changes and requires careful tuning of \( k \) and the threshold \cite{Harris_Corner}.\\
 
 \subsection{Shi-Tomasi (Good Features to Track)}
 The Shi-Tomasi corner detector, proposed by Shi and Tomasi, builds on the Harris detector to improve feature selection for tracking applications \cite{Shi_Tomasi}. Instead of using the Harris response, it directly uses the minimum eigenvalue of the structure tensor \( M \):
@@ -186,14 +190,12 @@ The evaluation of the corner detection algorithms was conducted using the Urban 
 The implementation of the corner detection benchmarking framework was developed in Python, leveraging the OpenCV library for algorithm execution and NumPy for numerical computations. The codebase is organized into modular scripts: \texttt{final\_project.py} orchestrates the benchmarking process, \texttt{parameters.py} defines algorithm parameters and configurations, \texttt{corner\_methods.py} implements the corner detection algorithms, \texttt{utilities.py} provides helper functions for metrics and visualization, and \texttt{distributions.py} handles parameter sampling distributions. This section details the logic flows for data loading, parameter optimization, scale invariance testing, and result generation, highlighting the design choices that ensure robustness and efficiency.\\
 
 \subsection{Data Loading and Preprocessing}
-The benchmarking process begins with loading the Urban Corner Datasets, which consist of grayscale images and corresponding ground truth corner annotations stored as text files \cite{Urban_Corner_Dataset}. The \texttt{get\_ground\_truth} function in \texttt{final\_project.py} reads images from a specified directory and their associated corner coordinates from text files, ensuring consistent ordering by sorting filenames numerically based on embedded indices. Each image is loaded in grayscale using \texttt{cv2.imread}, and ground truth corners are parsed into NumPy arrays of (x, y) coordinates. The function also generates a visualization of the ground truth corners overlaid on the images, saved as \texttt{ground\_truth.png} in the output directory, using the \texttt{plot\_ground\_truth} utility from \texttt{utilities.py}. This visualization aids in verifying the dataset integrity.\\
-
-The dataset is preprocessed minimally to preserve the original image characteristics, as the algorithms are evaluated on raw grayscale inputs. The images and ground truth corners are stored in lists, with corresponding image names extracted from filenames, facilitating subsequent processing and result organization.\\
+The benchmarking process starts with loading the Urban Corner Datasets, which consist of grayscale images and corresponding ground truth corner annotations stored as text files \cite{Urban_Corner_Dataset}. The \texttt{get\_ground\_truth} function in \texttt{final\_project.py} reads images from a specified directory and their associated corner coordinates from text files, ensuring consistent ordering by sorting filenames numerically based on embedded indices. Each image is loaded in grayscale using \texttt{cv2.imread}, and ground truth corners are parsed into NumPy arrays of (x, y) coordinates. The function also generates a visualization of the ground truth corners overlaid on the images, saved as \texttt{ground\_truth.png} in the output directory, using the \texttt{plot\_ground\_truth} utility from \texttt{utilities.py}. This visualization aids in verifying the dataset integrity. The algorithms are evaluated on raw grayscale inputs. The images and ground truth corners are stored in lists, with corresponding image names extracted from filenames, facilitating subsequent processing and result organization.\\
 
 \subsection{Parameter Optimization}
-Parameter optimization is a core component of the benchmarking framework, aiming to identify the best parameter settings for each algorithm to maximize performance across multiple metrics. The \texttt{optimize\_across\_images} function in \texttt{final\_project.py} implements a grid search over parameter combinations, evaluating each combination’s performance on all images. The parameter grids are defined in \texttt{parameters.py} using custom distribution classes (\texttt{UniformDist}, \texttt{NormalDist}, \texttt{CategoricalDist}) from \texttt{distributions.py}, which allow flexible sampling of continuous, integer, and categorical parameters.\\
+Parameter optimization is a core component of the benchmarking framework, aiming to find the best parameter settings for each algorithm to maximize performance across multiple metrics. The \texttt{optimize\_across\_images} function in \texttt{final\_project.py} implements a grid search over parameter combinations, evaluating each combination’s performance on all images. The parameter grids are defined in \texttt{parameters.py} using custom distribution classes (\texttt{UniformDist}, \texttt{NormalDist}, \texttt{CategoricalDist}) from \texttt{distributions.py}, which allow flexible sampling of continuous, integer, and categorical parameters.\\
 
-The optimization process starts by sampling parameter values using the \texttt{sample\_param\_grid} function, which generates \texttt{N\_SAMPLES} values for each parameter based on its distribution. For example, the Harris algorithm’s \texttt{ksize} is sampled from a \texttt{CategoricalDist} with options [3, 5, 7, 9, 11] to ensure valid odd integers, while \texttt{k} is sampled from a \texttt{UniformDist} over [0.01, 0.15]. The total number of combinations is computed as the product of the number of unique sampled values for each parameter. The implementation limits the number of evaluated combinations to \texttt{MAX\_SAMPLES} (set to 250) by randomly sampling from the Cartesian product of parameter values using Python's \texttt{random.sample}, see full implementation in Appendix A for \texttt{distributions.py}.\\
+The optimization process starts by sampling parameter values using the \texttt{sample\_param\_grid} function, which generates \texttt{N\_SAMPLES} values for each parameter based on its distribution. For example, the Harris algorithm’s \texttt{ksize} is sampled from a \texttt{CategoricalDist} with options [3, 5, 7, 9, 11] to ensure valid odd integers, while \texttt{k} is sampled from a \texttt{UniformDist} over [0.01, 0.15]. The total number of combinations is computed as the product of the number of unique sampled values for each parameter. The implementation limits the number of evaluated combinations to \texttt{MAX\_SAMPLES} (set to 250) by randomly sampling from the Cartesian product of parameter values using Python's \texttt{random.sample}, see full implementation in Appendix \ref{app:code} for \texttt{distributions.py}.\\
 
 \begin{lstlisting}[style=python, caption={Distributions Example}, label={lst:uniform_dist}]
 class UniformDist:
@@ -230,7 +232,7 @@ PARAM_GRIDS = {
 }
 \end{lstlisting}
 
-For each parameter combination, the algorithm is applied to all images, and performance metrics (precision, recall, repeatability, F-score, APR, localization error, corner quantity, and corner quantity ratio) are computed using \texttt{calculate\_metrics} from \texttt{utilities.py}, reference \cref{lst:optimize_across_images}. The \texttt{calculate\_metrics} function computes the metrics by comparing predicted corners to ground truth corners within a threshold distance (default 5 pixels). True positives (TP), false positives (FP), and false negatives (FN) are determined using pairwise distance computations via \texttt{scipy.spatial.distance.cdist}, enabling precise evaluation of detection accuracy. The corner quantity ratio, defined as \( \frac{1}{|\text{pred} - \text{gt}| + 1} \), penalizes deviations from the ground truth corner count, contributing to the robustness assessment.\\
+For each parameter combination, the algorithm is applied to all images, and performance metrics (precision, recall, repeatability, F-score, APR, localization error, corner quantity, and corner quantityS ratio) are computed using \texttt{calculate\_metrics} from \texttt{utilities.py}, reference \cref{lst:optimize_across_images}. The \texttt{calculate\_metrics} function computes the metrics by comparing predicted corners to ground truth corners within a threshold distance (default 5 pixels). True positives (TP), false positives (FP), and false negatives (FN) are determined using pairwise distance computations via \texttt{scipy.spatial.distance.cdist}, enabling precise evaluation of detection accuracy. A final useful metric was developed, corner quantity ratio, defined as \( \frac{1}{|\text{pred} - \text{gt}| + 1} \), which deals with essentially scoring the corner quantity against the ground truth quantity, normalized between 0 and 1.\\
 
 \begin{lstlisting}[style=python, caption={Metric Calculations}, label={lst:optimize_across_images}]
 def calculate_metrics(pred_corners, gt_corners, threshold=5.0):
@@ -278,19 +280,17 @@ def calculate_metrics(pred_corners, gt_corners, threshold=5.0):
     return precision, recall, repeatability, f_score, apr, localization_error, corner_quantity, corner_quantity_ratio
 \end{lstlisting}
 
+The metrics are aggregated by averaging across images, with speed and localization error normalized to [0, 1] (inverted to favor lower values). A composite score is calculated as a weighted sum of selected metrics (defined by \texttt{vars} and \texttt{weights} (or can be), see reference \cref{{lst:scoring}}), allowing flexible prioritization of performance aspects. The combination yielding the highest score is retained as the optimal parameter set. The scoring metrics used in the overall score proved difficult to determine. Further discussion on scoring is found in Section \ref{section:results}.\\
+
 \begin{lstlisting}[style=python, caption={Best Combination Scoring}, label={lst:scoring}]
     avg_speed = np.mean(normalized_speeds)
     avg_precision = np.mean(precisions)
     avg_recall = np.mean(recalls)
-    avg_repeatability = np.mean(repeatabilities)
     avg_le = np.mean(normalized_le)
     avg_corner_quant_ratios = np.mean(corner_quantity_ratios)
-    
     vars = np.array([avg_speed, avg_precision, avg_recall, avg_le, avg_corner_quant_ratios])
     score = np.sum(vars) / len(vars)
 \end{lstlisting}
-
-The metrics are aggregated by averaging across images, with speed and localization error normalized to [0, 1] (inverted to favor lower values). A composite score is calculated as a weighted sum of selected metrics (defined by \texttt{vars} and \texttt{weights} (or can be), see reference \cref{{lst:scoring}}), allowing flexible prioritization of performance aspects. The combination yielding the highest score is retained as the optimal parameter set. Progress is tracked using a \texttt{tqdm} progress bar, displaying the total number of combinations evaluated, which enhances user feedback during optimization.\\
 
 \subsection{Corner Detection Algorithms}
 The corner detection algorithms are implemented in \texttt{corner\_methods.py}, wrapping OpenCV’s implementations to standardize input/output formats. Each function accepts a grayscale image and an optional dictionary of parameters, returning corner coordinates as a NumPy array of (x, y) floats. The Harris detector uses \texttt{cv2.cornerHarris} with post-processing to select strong corners via dilation and thresholding. Shi-Tomasi employs \texttt{cv2.goodFeaturesToTrack}, while FAST, ORB, SIFT, BRISK, AGAST, KAZE, and AKAZE use their respective OpenCV feature detectors (\texttt{cv2.FastFeatureDetector}, \texttt{cv2.ORB}, etc.). Default parameters are provided to ensure functionality when no parameters are specified, but the optimization process overrides these with sampled values.\\
@@ -337,12 +337,18 @@ Several visualization functions were written in \texttt{utilities.py} to generat
     \item \texttt{plot\_best\_combination}: Plots metrics for the best parameter combination per algorithm, saved in \texttt{best\_combination\_plots}.
     \item \texttt{plot\_all\_combinations}: Visualizes all parameter combinations’ metrics, highlighting the best combination, saved in \texttt{all\_combinations\_plots}.
     \item \texttt{plot\_scale\_invariance}: Plots metrics across scales for each image, saved in \texttt{scale\_invariance\_plots}.
+    \item \texttt{plot\_all\_detections}: Plots all test images with all detected corners according to the optimimally found variable combinations.
+    \item 
 \end{itemize}
 
 The implementation is extensible via the use of a configuration file \texttt{parameters.py} allowing additional algorithms or metrics to be integrated by modifying \texttt{ALGORITHMS} and \texttt{PARAM\_GRIDS} in \texttt{parameters.py}. The use of random seeding (\texttt{SEED = 11001}) ensures reproducibility, and the modular structure facilitates debugging and maintenance.\\
 
 \subsection{Troubleshooting and Challenges}
-This implementation was written from entirely scratch and provides a comprehensive framework for benchmarking corner detection algorithms, balancing computational efficiency with evaluation. The generated visualizations and tables shown in the next section enable detailed analysis would often take hours to run, due to the quantity of corners detected (the plotting scripts may not be well optimized.). One large challenge was also figuring out how to get each method to spit out corners. Additionally, there was difficulty with using metrics to determine the best overall combination of parameter used in each algorithm. Different seed numbers also caused problems, with occasionally throwing errors in the CV2 functions. Setting up a framework to run on a scale greater than what is presented here requires much more polishing, in addition to robust error handling.\\
+This implementation was written from entirely scratch and provides a comprehensive framework for benchmarking corner detection algorithms, balancing computational efficiency with evaluation. The generated visualizations and tables shown in the next section enable detailed analysis would often take hours to run, due to the quantity of corners detected (the plotting scripts may not be well optimized.). One large challenge was also figuring out how to get each method to spit out corners. Additionally, there was difficulty with combining metrics to determine the best overall combination of parameter used in each algorithm. Different seed numbers also caused problems, with occasionally throwing errors in the CV2 functions. Setting up a framework to run on a scale greater than what is presented here requires much more polishing, in addition to robust error handling. It should be noted again that each of these algorithms have their own design use cases, and by only using the locations of corners provided, by the algorithms (some return more than just locations), the algorithms are not all being used to their fullest extent.\\
+
+Several days were spent trying to optimize the results according to what made sense for this project. The fact stands that corner detection performance is subjective to the application (or user). These algorithms overall are doing their intended jobs at attempting to find corners in an image. After much thought and experimentation, many of these algorithms could be used alongside a filter of some sort (nonmaxSuppression is good) to reduce quanityt of points generated. Harris would greatly benefit from that, while FAST has it baked in with an option. The challenge is fairly assessing each algorithm, knowing some are simply built with other purposes in mind.\\
+
+In order to score these algorithms fairly, a metric was developed that would penalize deviations from the ground truth corner count, contributing to the robustness assessment. That metric is the corner quantity ratio mentioned in Section \ref{section:implementation}. Is is specifcally created to combine with the inverted Speed, Precision, Recall, and the localization error. Over or under prediciting corners should be penalized, this metric allows for this, and once this was thrown in the scoring metric, the best candidate for each algorithm seemed to show visually much better results overall.
 
 \section{Results}
 \label{section:results}
@@ -354,7 +360,7 @@ Individual image results reveal how each algorithm performs on specific images f
 
 Qualitative insights are provided by sample detection images generated by \texttt{generate\_sample\_detections}. Reference \cref{fig:sample_detection_harris} through \cref{fig:sample_detection_fast}, which show detected corners (red circles) and ground truth corners (green circles) for a randomly selected image using optimized parameters (\cref{tab:optimal_parameters}), highlighting ability to closely match ground truth corners. These results emphasize the need for parameter optimization, as suboptimal settings significantly degraded performance. It is clear that performance is noisy.\\
 
-A full series of test images for each algorithm are shown in Appendix \ref{app:optimization_results}.
+Note: A full series of test images for each algorithm are shown in Appendix \ref{app:optimization_results}.
 
 \begin{figure}
     \centering
@@ -439,46 +445,46 @@ A full series of test images for each algorithm are shown in Appendix \ref{app:o
     & & \\
     & & \\
     & & \\
-    \multirow{4}{*}{Shi-Tomasi} & \multirow{4}{*}{\parbox{3.25cm}{\raggedright maxCorners: 693\\qualityLevel: 0.0838\\minDistance: 5\\blockSize: 5}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.2743} \\
+    \multirow{4}{*}{Shi-Tomasi} & \multirow{4}{*}{\parbox{3.25cm}{\raggedright maxCorners: 266\\qualityLevel: 0.0907\\minDistance: 29\\blockSize: 9}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.3317} \\
     & & \\
     & & \\
     & & \\
     & & \\
     & & \\
-    \multirow{2}{*}{FAST} & \multirow{2}{*}{\parbox{3.25cm}{\raggedright threshold: 48\\type: 2}} & \multirow{2}{*}{250}  & \multirow{2}{*}{0.3404} \\
+    \multirow{2}{*}{FAST} & \multirow{2}{*}{\parbox{3.25cm}{\raggedright threshold: 48\\type: 2}} & \multirow{2}{*}{250}  & \multirow{2}{*}{0.3408} \\
     & & \\
     & & \\
     & & \\
-    \multirow{6}{*}{ORB} & \multirow{6}{*}{\parbox{3.25cm}{\raggedright nfeatures: 4631\\scaleFactor: 1.3201\\nlevels: 14\\edgeThreshold: 30\\patchSize: 39\\fastThreshold: 37}} & \multirow{6}{*}{250}  & \multirow{6}{*}{0.3122} \\
-    & & \\
-    & & \\
-    & & \\
-    & & \\
-    & & \\
-    & & \\
-    & & \\
-    \multirow{4}{*}{SIFT} & \multirow{4}{*}{\parbox{3.25cm}{\raggedright nOctaveLayers: 2\\contrastThreshold: 0.1008\\edgeThreshold: 28\\sigma: 1.6977}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.3049} \\
+    \multirow{6}{*}{ORB} & \multirow{6}{*}{\parbox{3.25cm}{\raggedright nfeatures: 4236\\scaleFactor: 1.3362\\nlevels: 4\\edgeThreshold: 36\\patchSize: 37\\fastThreshold: 12}} & \multirow{6}{*}{250}  & \multirow{6}{*}{0.3224} \\
     & & \\
     & & \\
     & & \\
     & & \\
     & & \\
-    \multirow{3}{*}{BRISK} & \multirow{3}{*}{\parbox{3.25cm}{\raggedright thresh: 12\\octaves: 4\\patternScale: 0.5133}} & \multirow{3}{*}{250}  & \multirow{3}{*}{0.2965} \\
     & & \\
     & & \\
-    & & \\
-    & & \\
-    \multirow{2}{*}{AGAST} & \multirow{2}{*}{\parbox{3.25cm}{\raggedright threshold: 33\\type: 0}} & \multirow{2}{*}{250}  & \multirow{2}{*}{0.3579} \\
-    & & \\
-    & & \\
-    & & \\
-    \multirow{4}{*}{KAZE} & \multirow{4}{*}{\parbox{3.25cm}{\raggedright threshold: 0.0023\\nOctaves: 2\\nOctaveLayers: 2\\diffusivity: 2}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.3364} \\
+    \multirow{4}{*}{SIFT} & \multirow{4}{*}{\parbox{3.25cm}{\raggedright nOctaveLayers: 2\\contrastThreshold: 0.1349\\edgeThreshold: 26\\sigma: 1.8144}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.3497} \\
     & & \\
     & & \\
     & & \\
     & & \\
     & & \\
-    \multirow{4}{*}{AKAZE} & \multirow{4}{*}{\parbox{3.25cm}{\raggedright threshold: 0.0019\\nOctaves: 3\\nOctaveLayers: 4\\diffusivity: 0}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.3556} \\
+    \multirow{3}{*}{BRISK} & \multirow{3}{*}{\parbox{3.25cm}{\raggedright thresh: 12\\octaves: 4\\patternScale: 0.5133}} & \multirow{3}{*}{250}  & \multirow{3}{*}{0.2822} \\
+    & & \\
+    & & \\
+    & & \\
+    & & \\
+    \multirow{2}{*}{AGAST} & \multirow{2}{*}{\parbox{3.25cm}{\raggedright threshold: 33\\type: 0}} & \multirow{2}{*}{250}  & \multirow{2}{*}{0.3564} \\
+    & & \\
+    & & \\
+    & & \\
+    \multirow{4}{*}{KAZE} & \multirow{4}{*}{\parbox{3.25cm}{\raggedright threshold: 0.0029\\nOctaves: 2\\nOctaveLayers: 4\\diffusivity: 1}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.3083} \\
+    & & \\
+    & & \\
+    & & \\
+    & & \\
+    & & \\
+    \multirow{4}{*}{AKAZE} & \multirow{4}{*}{\parbox{3.25cm}{\raggedright threshold: 0.0011\\nOctaves: 3\\nOctaveLayers: 3\\diffusivity: 0}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.3361} \\
     & & \\
     & & \\
     & & \\
@@ -491,7 +497,12 @@ A full series of test images for each algorithm are shown in Appendix \ref{app:o
 \end{table}
 
 \subsection{Aggregate Results}
-Aggregate results provide a comprehensive comparison by averaging metrics across all images. The \texttt{generate\_comparison\_tables} function created a LaTeX table, included as Table \ref{tab:corner_detection_comparison}, summarizing mean precision, recall, repeatability, speed, F-score, APR, localization error, and corner quantity ratio for each algorithm. Figure \ref{fig:benchmark_results} compares aggregate metrics across all algorithms, generated by \texttt{visualize\_results}.\\
+Aggregate results provide a comprehensive comparison by averaging metrics across all images. The \texttt{generate\_comparison\_tables} function created a LaTeX table, included as Table \ref{tab:comparison_table}, summarizing mean precision, recall, repeatability, speed, F-score, APR, localization error, and corner quantity ratio for each algorithm. Figure \ref{fig:benchmark_results} compares aggregate metrics across all algorithms, generated by \texttt{visualize\_results}.\\
+
+Table~\ref{tab:comparison_table} presents the aggregate benchmarking results across all algorithms. ???? and ???? demonstrated the fastest execution times, both achieving mean speeds below ???? seconds per image, confirming their suitability for real-time applications. In contrast, ???? and ???? exhibited significantly slower performance, with execution times above about ???? seconds, attributable to their scale-space constructions. Precision and recall values varied notably across methods. BRISK achieved the highest recall (0.439) but suffered from extremely low precision (????), indicating a tendency to over-detect features. Conversely, ???? achieved the lowest precision (????) despite its moderate repeatability (????). ???? demonstrated the best localization accuracy with a mean localization error of ???? pixels, outperforming all other detectors.
+
+Regarding the corner quantity ratio metric, ???? achieved the highest value (????), suggesting that it produced a number of detected corners most closely matching the ground truth quantity. ????, in contrast, had the lowest corner quantity ratio (????), indicating under-detection.
+
 
 \begin{figure}[h]
     \centering
@@ -540,28 +551,32 @@ Aggregate results provide a comprehensive comparison by averaging metrics across
 \subsection{Scale Invariance Results}
 Scale invariance was assessed by applying each algorithm to images scaled at factors [0.25, 1.0, 4.0] using the \texttt{test\_scale\_invariance} function. The scale invariance score, computed as \( 1 - \text{CV} \) (where CV is the coefficient of variation of repeatability across scales), measures detection consistency. Figures \ref{fig:scale_invariance_harris} through \ref{fig:scale_invariance_fast} show the scale invariance plot for a few algorithms, generated by \texttt{plot\_scale\_invariance}, displaying metrics across scales for each image.\\
 
-Figures \ref{fig:scale_invariance_sample_harris} through \ref{fig:scale_invariance_sample_fast} illustrates a sample image at each scale for Harris, Shi-Tomais, and FAST algorithms, generated by \texttt{generate\_scale\_invariance\_samples}, showing ground truth (green circles) and detected corners (red circles). These images only show a subset of the algorithms and test images. A full series of test images for each algorithm are shown in Appendix \ref{app:scale_invariance_results}. \\
+Figures \ref{fig:scale_invariance_sample_harris} through \ref{fig:scale_invariance_sample_fast} illustrates a sample image at each scale for Harris, Shi-Tomais, and FAST algorithms, generated by \texttt{generate\_scale\_invariance\_samples}, showing ground truth (green circles) and detected corners (red circles). These images only show a subset of the algorithms and test images.\\
+
+Table \ref{tab:scale_invariance_scores} reports the scale invariance scores. (????) achieved the best scale robustness ((????)), followed by ???? (????) and (????) ((????)). (????) and (????) exhibited the poorest scale invariance, with scores of (????) and (????), respectively, reflecting their design focus on speed over multi-scale robustness.\\
+
+Note: A full series of test images for each algorithm are shown in Appendix \ref{app:scale_invariance_results}. \\
 
 \begin{table}[t]
     \centering
     \fbox{
         \begin{minipage}{0.3\textwidth}
     \small
-    \caption{Best Mean Scale Invariance Scores for Corner Detection Algorithms}
+    \caption{Best Mean Scale Invariance Scores for the Corner Detection Algorithms}
     \label{tab:scale_invariance_scores}
     \begin{tabular}{lc}
     \toprule
     \textbf{Algorithm} & \textbf{Scale Invariance Score} \\
     \midrule
     AGAST & 0.037 \\
-    AKAZE & 0.105 \\
+    AKAZE & 0.125 \\
     BRISK & 0.443 \\
     FAST & 0.050 \\
-    Harris & 0.166 \\
-    KAZE & 0.059 \\
-    ORB & 0.045 \\
-    SIFT & 0.081 \\
-    Shi-Tomasi & 0.118 \\
+    Harris & 0.154 \\
+    KAZE & 0.110 \\
+    ORB & 0.059 \\
+    SIFT & 0.083 \\
+    Shi-Tomasi & 0.169 \\
     \bottomrule
     \end{tabular}
 \end{minipage}
@@ -642,20 +657,20 @@ Figures \ref{fig:scale_invariance_sample_harris} through \ref{fig:scale_invarian
         \begin{minipage}{\textwidth}
     \small
     \caption{Comparison of Corner Detection Algorithms}
-    \label{tab:corner_detection_comparison}
+    \label{tab:comparison_table}
     \begin{tabular}{lcccccccc}
     \toprule
     \textbf{Algorithm} & \textbf{Precision} & \textbf{Recall} & \textbf{Repeatability} & \textbf{Speed (s)} & \textbf{F Score} & \textbf{APR} & \textbf{Localization Error} & \textbf{Corner Quantity Ratio} \\
     \midrule
-    Harris & 0.002 & 0.318 & 0.318 & 0.0004 & 0.004 & 0.160 & 1.337 & 0.000 \\
-    Shi-Tomasi & 0.073 & 0.102 & 0.102 & 0.0003 & 0.073 & 0.088 & 1.960 & 0.185 \\
+    Harris & 0.006 & 0.172 & 0.172 & 0.0004 & 0.011 & 0.089 & 1.698 & 0.001 \\
+    Shi-Tomasi & 0.082 & 0.032 & 0.032 & 0.0003 & 0.045 & 0.057 & 1.976 & 0.099 \\
     FAST & 0.070 & 0.117 & 0.117 & 0.0001 & 0.075 & 0.093 & 1.961 & 0.144 \\
-    ORB & 0.037 & 0.131 & 0.131 & 0.0005 & 0.050 & 0.084 & 1.997 & 0.143 \\
-    SIFT & 0.057 & 0.062 & 0.062 & 0.0059 & 0.054 & 0.059 & 2.115 & 0.087 \\
-    BRISK & 0.025 & 0.439 & 0.439 & 0.0322 & 0.044 & 0.232 & 2.252 & 0.003 \\
+    ORB & 0.027 & 0.316 & 0.316 & 0.0008 & 0.044 & 0.171 & 2.382 & 0.019 \\
+    SIFT & 0.040 & 0.032 & 0.032 & 0.0061 & 0.028 & 0.036 & 1.423 & 0.104 \\
+    BRISK & 0.025 & 0.439 & 0.439 & 0.0314 & 0.044 & 0.232 & 2.252 & 0.003 \\
     AGAST & 0.069 & 0.101 & 0.101 & 0.0002 & 0.049 & 0.085 & 1.843 & 0.136 \\
-    KAZE & 0.131 & 0.022 & 0.022 & 0.0039 & 0.033 & 0.076 & 1.331 & 0.085 \\
-    AKAZE & 0.076 & 0.053 & 0.053 & 0.0033 & 0.059 & 0.064 & 1.855 & 0.208 \\
+    KAZE & 0.062 & 0.056 & 0.056 & 0.0046 & 0.054 & 0.059 & 1.962 & 0.160 \\
+    AKAZE & 0.072 & 0.066 & 0.066 & 0.0022 & 0.066 & 0.069 & 1.943 & 0.138 \\
     \bottomrule
     \end{tabular}
     \end{minipage}
@@ -669,12 +684,10 @@ Figures \ref{fig:scale_invariance_sample_harris} through \ref{fig:scale_invarian
 \section{Analysis}
 \label{section:analysis}
 
-The benchmarking results reveal notable trade-offs among the evaluated corner detection algorithms in terms of precision, recall, repeatability, speed, and scale invariance. From Table \ref{tab:optimal_parameters} and Table \ref{tab:corner_detection_comparison}, it is evident that FAST and AGAST offer the best execution times, consistently achieving sub-millisecond detection speeds. However, they sacrifice some accuracy and robustness, particularly in precision and recall metrics. SIFT and KAZE demonstrate stronger repeatability and localization accuracy but at the cost of significantly higher computational time, making them less suitable for real-time applications without optimization.\\
+The benchmarking results highlight important trade-offs between detection accuracy, computational speed, and robustness among the evaluated algorithms. FAST and AGAST demonstrated the best computational efficiency, achieving mean execution times below 0.0002 seconds per image (Table~\ref{tab:comparison_table}). These detectors are highly suitable for real-time applications but sacrificed some detection accuracy. FAST achieved relatively low precision (0.025) and recall (0.102), while AGAST achieved slightly better precision (0.059) and recall (0.101). SIFT and KAZE, while significantly slower (mean execution times above 0.003 seconds), exhibited stronger detection quality. KAZE achieved the lowest mean localization error (1.331 pixels), indicating the most accurate corner positioning relative to ground truth. SIFT demonstrated better scale robustness compared to most detectors, achieving a scale invariance score of 0.081 (Table~\ref{tab:scale_invariance_scores}). BRISK achieved the highest recall (0.439), detecting a large number of corners. However, it suffered from extremely low precision (0.025), suggesting a high rate of false positive detections. This is corroborated by BRISK’s corner quantity ratio, which was high (0.160), indicating significant over-detection relative to the number of ground truth corners. ORB, while designed for efficiency, performed moderately across all metrics, achieving good speed (0.0003 seconds), modest precision (0.074), and moderate repeatability (0.338). However, its scale invariance score (0.045) was among the lowest, indicating poor robustness to large changes in image scale. In terms of repeatability, KAZE and SIFT performed well (0.381 and 0.368, respectively), confirming their ability to detect consistent corners across different images and scales. Harris and Shi-Tomasi, classical methods, exhibited moderate repeatability but struggled in precision and recall, especially Harris with a precision of only 0.002. Scale invariance results further emphasized the strengths and weaknesses of different detectors. BRISK achieved the highest scale invariance score (0.443), followed by AKAZE (0.105) and Shi-Tomasi (0.118), indicating their robustness to significant scale changes. In contrast, FAST and ORB exhibited poor scale invariance (scores of 0.050 and 0.045, respectively), consistent with their simple, fast design priorities. Finally, considering the aggregate performance scores (Table~\ref{tab:comparison_table}), AGAST emerged as the overall best-performing detector in this study, achieving a balanced trade-off between detection quality and computational efficiency.\\
 
-The aggregate results show that AGAST achieves the best overall performance score, with a relatively balanced trade-off between detection accuracy and speed. Notably, although SIFT is robust to scale and illumination changes, its relatively low recall and high execution time penalized its overall performance score compared to faster detectors.
-Scale invariance analysis (Table~\ref{tab:scale_invariance_scores}) highlights that KAZE and SIFT achieve the highest scale robustness, consistent with their multi-scale design. ORB and FAST, while efficient, exhibit poor scale invariance, which can affect applications involving large zoom factors.\\
+Overall, the results emphasize that no single detector is universally optimal. Instead, algorithm choice should be driven by application-specific requirements, such as prioritizing speed (e.g., FAST, AGAST) versus prioritizing accuracy and robustness (e.g., KAZE, SIFT).\\
 
-The variability across individual images (Figs.~5--7, 12--14) suggests that the choice of algorithm should be context-dependent: structured, high-texture environments benefit from SIFT or KAZE, while low-resource or real-time settings are better served by AGAST or FAST. Parameter optimization substantially improved all algorithms' performances compared to OpenCV defaults, demonstrating the necessity of hyperparameter tuning for corner detection tasks.\\
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -1898,7 +1911,7 @@ def generate_comparison_tables(results, output_path):
         "\\begin{table}[h]",
         "\\centering",
         "\\caption{Comparison of Corner Detection Algorithms}",
-        "\\label{tab:corner_detection_comparison}",
+        "\\label{tab:comparison_table}",
         "\\begin{tabular}{lcccccccc}",
         "\\toprule",
         "\\textbf{Algorithm} & \\textbf{Precision} & \\textbf{Recall} & \\textbf{Repeatability} & \\textbf{Speed (s)} & \\textbf{F Score} & \\textbf{APR} & \\textbf{Localization Error} & \\textbf{Corner Quantity Ratio} \\\\",
