@@ -1,0 +1,63 @@
+\begin{table}[h]
+\centering
+\small
+\caption{Optimal Parameters for Corner Detection Algorithms}
+\label{tab:optimal_parameters}
+\begin{tabular}{lp{3.5cm}cc}
+\toprule
+\textbf{Algorithm} & \textbf{Optimal Parameters} & \textbf{$\#$ Tests} & \textbf{Best Score} \\
+\midrule
+\multirow{4}{*}{Harris} & \multirow{4}{*}{\parbox{3.25cm}{\raggedright blockSize: 9\\ksize: 3\\k: 0.0376\\borderType: 4}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.2834} \\
+& & \\
+& & \\
+& & \\
+& & \\
+& & \\
+\multirow{4}{*}{Shi-Tomasi} & \multirow{4}{*}{\parbox{3.25cm}{\raggedright maxCorners: 757\\qualityLevel: 0.0962\\minDistance: 6\\blockSize: 5}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.2781} \\
+& & \\
+& & \\
+& & \\
+& & \\
+& & \\
+\multirow{2}{*}{FAST} & \multirow{2}{*}{\parbox{3.25cm}{\raggedright threshold: 48\\type: 2}} & \multirow{2}{*}{250}  & \multirow{2}{*}{0.3409} \\
+& & \\
+& & \\
+& & \\
+\multirow{6}{*}{ORB} & \multirow{6}{*}{\parbox{3.25cm}{\raggedright nfeatures: 4210\\scaleFactor: 1.1188\\nlevels: 4\\edgeThreshold: 26\\patchSize: 25\\fastThreshold: 7}} & \multirow{6}{*}{250}  & \multirow{6}{*}{0.3081} \\
+& & \\
+& & \\
+& & \\
+& & \\
+& & \\
+& & \\
+& & \\
+\multirow{4}{*}{SIFT} & \multirow{4}{*}{\parbox{3.25cm}{\raggedright nOctaveLayers: 4\\contrastThreshold: 0.068\\edgeThreshold: 26\\sigma: 2.3377}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.3056} \\
+& & \\
+& & \\
+& & \\
+& & \\
+& & \\
+\multirow{3}{*}{BRISK} & \multirow{3}{*}{\parbox{3.25cm}{\raggedright thresh: 12\\octaves: 5\\patternScale: 0.5133}} & \multirow{3}{*}{250}  & \multirow{3}{*}{0.2814} \\
+& & \\
+& & \\
+& & \\
+& & \\
+\multirow{2}{*}{AGAST} & \multirow{2}{*}{\parbox{3.25cm}{\raggedright threshold: 33\\type: 0}} & \multirow{2}{*}{250}  & \multirow{2}{*}{0.3561} \\
+& & \\
+& & \\
+& & \\
+\multirow{4}{*}{KAZE} & \multirow{4}{*}{\parbox{3.25cm}{\raggedright threshold: 0.0027\\nOctaves: 3\\nOctaveLayers: 2\\diffusivity: 2}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.2988} \\
+& & \\
+& & \\
+& & \\
+& & \\
+& & \\
+\multirow{4}{*}{AKAZE} & \multirow{4}{*}{\parbox{3.25cm}{\raggedright threshold: 0.0019\\nOctaves: 4\\nOctaveLayers: 6\\diffusivity: 1}} & \multirow{4}{*}{250}  & \multirow{4}{*}{0.342} \\
+& & \\
+& & \\
+& & \\
+& & \\
+& & \\
+\bottomrule
+\end{tabular}
+\end{table}

@@ -1,0 +1,21 @@
+\begin{table}[t]
+\centering
+\small
+\caption{Mean Scale Invariance Scores for Corner Detection Algorithms}
+\label{tab:scale_invariance_scores}
+\begin{tabular}{lc}
+\toprule
+Algorithm & Scale Invariance Score \\
+\midrule
+AGAST & 0.037 \\
+AKAZE & 0.109 \\
+BRISK & 0.442 \\
+FAST & 0.050 \\
+Harris & 0.250 \\
+KAZE & 0.106 \\
+ORB & 0.145 \\
+SIFT & 0.182 \\
+Shi-Tomasi & 0.135 \\
+\bottomrule
+\end{tabular}
+\end{table}

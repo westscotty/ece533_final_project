@@ -5,4 +5,4 @@ reports/out/*
 *.fdb_latexmk
 archive/*
 .vscode/*
-results*/*
+results2/*
